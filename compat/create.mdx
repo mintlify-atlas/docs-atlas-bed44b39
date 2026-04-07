@@ -1,0 +1,51 @@
+---
+title: "Create Mod Compatibility"
+description: "How Valkyrien Skies 2 works with Create and Create: Big Cannons."
+---
+
+Valkyrien Skies 2 has built-in compatibility with the [Create mod](https://www.curseforge.com/minecraft/mc-mods/create). Create's mechanical contraptions, gears, shafts, and kinetic machinery all function correctly on VS2 ships out of the box.
+
+<Note>
+  VS2 targets Create Fabric **6.0.7.0+build.1728-mc1.20.1** and Forge Create on Minecraft 1.20.1. Compatibility is tested against these specific versions.
+</Note>
+
+## What works
+
+- Mechanical contraptions riding on ships
+- Rotational force networks on ships
+- Deployers, drills, and harvester arms
+- Trains on ship-mounted tracks
+- Copycat panels assembling onto ships correctly (a duplication bug was fixed in VS 2.4.11)
+
+<Warning>
+  The Create compatibility code was originally and largely written by [FluffyJenkins](https://github.com/FluffyJenkins). Some edge cases may still exist for complex contraptions.
+</Warning>
+
+## Create: Big Cannons
+
+VS2 also supports [Create: Big Cannons](https://modrinth.com/mod/create-big-cannons). Autocannons that previously broke when mounted on VS ships are fixed as of VS 2.4.11.
+
+### Cannon recoil on ships
+
+When a cannon fires on a ship, VS2 can apply a recoil force to the ship in the opposite direction. This is disabled by default and controlled by server config.
+
+<Tabs>
+  <Tab title="Enable recoil">
+    In your server config, set:
+
+    ```toml
+    [CBC]
+    shellRecoil = true
+    shellRecoilMult = 500000.0
+    ```
+
+    `shellRecoilMult` controls the magnitude of the recoil force applied per shell. The default of `500000.0` is a starting point — tune it to match your ship mass.
+  </Tab>
+  <Tab title="Disable recoil">
+    Recoil is disabled by default (`shellRecoil = false`). No configuration change needed.
+  </Tab>
+</Tabs>
+
+## Assembly blacklist
+
+Certain Create blocks may be included in the VS2 assembly blacklist tag (`valkyrienskies:assemble_blacklist`) to prevent them from being moved during ship assembly. If you find a Create block that should or shouldn't be assembleable, this is the tag to modify via a datapack.

@@ -1,0 +1,39 @@
+---
+title: "Introduction"
+description: "Valkyrien Skies 2 is a physics simulation engine for Minecraft that lets players and mod developers create moving ships, aircraft, submarines, and more."
+keywords: ["valkyrien skies", "vs2", "physics", "minecraft mod", "ships", "aircraft"]
+---
+
+Valkyrien Skies 2 (VS2) is a Minecraft mod that replaces Minecraft's static world model with a full physics simulation engine. Blocks grouped into ships move, rotate, and collide with the world in real time — enabling ships, aircraft, submarines, and any other moving contraption you can build.
+
+VS2 is currently on version **2.5.0-beta.3**, targeting **Minecraft 1.20.1**. It supports Fabric, Quilt, and Forge.
+
+## Key features
+
+- **Physics ships** — blocks assembled into ships are simulated as rigid bodies with mass, inertia, and velocity
+- **Buoyancy** — ships float or sink based on displaced volume and block density
+- **Collision** — ships collide with terrain, other ships, and entities
+- **Mod API** — a stable Kotlin/Java API for integrating VS2 into your own mod
+- **Multi-loader** — runs on Fabric, Quilt, and Forge from a single codebase
+- **Mod compatibility** — built-in compatibility with Create, ComputerCraft, Dynmap, and more
+
+## Who this is for
+
+**Players** looking to use VS2 or addons built on top of it should start with the installation guide to get the mod running in their modpack.
+
+**Mod developers** wanting to build on the VS2 API — creating custom thrusters, control systems, or physics-aware blocks — should follow the quick start guide to add VS2 as a Gradle dependency.
+
+<Note>
+  VS2 is in beta. The API surface is largely stable, but some interfaces are marked `@Experimental` and may change between releases. Avoid using any class or item with "Debug" in its name outside of development environments.
+</Note>
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install VS2 for Fabric, Quilt, or Forge as a player or server operator.
+  </Card>
+  <Card title="Quick start for mod developers" icon="code" href="/quickstart">
+    Add VS2 as a Gradle dependency and access the API in your mod.
+  </Card>
+</CardGroup>

@@ -1,0 +1,157 @@
+---
+title: 'ServerShip'
+description: 'Server-side ship interface with physics control and mutable state.'
+---
+
+`ServerShip` extends [`Ship`](/api/ships/ship) with properties that can only be read and written from server-side code. It is defined in vs-core at `org.valkyrienskies.core.api.ships.ServerShip`.
+
+`LoadedServerShip` extends `ServerShip` and is only available while the ship's chunks are loaded in the world. It adds attachment access and the `ShipSettings` extension property.
+
+```
+Ship
+└── ServerShip
+    └── LoadedServerShip   (chunks currently loaded)
+```
+
+<Note>
+  All `ServerShip` and `LoadedServerShip` access must occur on the server game thread. Never read these objects from a client-side code path.
+</Note>
+
+## Additional properties
+
+<ParamField path="isStatic" type="Boolean">
+  **Mutable on `ServerShip`.** When set to `true`, the physics engine freezes the ship — no forces, gravity, or movement are applied. The ship becomes a static obstacle in the world.
+
+  ```kotlin
+  // Freeze a ship in place
+  serverShip.isStatic = true
+
+  // Re-enable physics
+  serverShip.isStatic = false
+  ```
+</ParamField>
+
+## LoadedServerShip
+
+`LoadedServerShip` is the subtype returned when the ship's chunks are currently ticking. It is the type used inside event callbacks such as `shipLoadEvent`, and is returned by `ServerLevel.getLoadedShipManagingPos(...)`.
+
+### ShipSettings
+
+Ship-specific server settings are stored as an attachment and accessed via an extension property. The property lazily creates a `ShipSettings` instance with default values if none exists.
+
+```kotlin
+// Extension property defined in ShipSettings.kt
+val LoadedServerShip.settings: ShipSettings
+```
+
+<ParamField path="settings.shouldGenerateChunks" type="Boolean" default="false">
+  When `true`, the ship's shipyard chunks will attempt to generate terrain. You almost never want this. Defaults to `false`.
+</ParamField>
+
+<ParamField path="settings.changeDimensionOnTouchPortals" type="Boolean" default="true">
+  When `true`, the ship travels through Nether/End portals and changes dimensions. Defaults to `true`.
+</ParamField>
+
+```kotlin
+// Disable portal dimension travel for this ship
+loadedShip.settings.changeDimensionOnTouchPortals = false
+```
+
+## Getting a ServerShip
+
+### From a level and ship ID
+
+```kotlin
+import org.valkyrienskies.core.api.ships.ServerShip
+import org.valkyrienskies.mod.api.shipWorld
+
+val ship: ServerShip? = serverLevel.shipWorld
+    ?.allShips
+    ?.getById(shipId) as? ServerShip
+```
+
+### From a block position (loaded ships only)
+
+```kotlin
+import org.valkyrienskies.mod.common.getLoadedShipManagingPos
+
+// Returns LoadedServerShip? — null if not loaded or not in a ship
+val loadedShip = serverLevel.getLoadedShipManagingPos(blockPos)
+```
+
+### Iterating all server ships
+
+```kotlin
+import org.valkyrienskies.mod.api.shipWorld
+
+val server: MinecraftServer = /* ... */
+for (ship in server.shipWorld?.allShips ?: emptyList()) {
+    // ship is ServerShip
+}
+```
+
+## Assembling a ship
+
+`ShipAssembler.assembleToShip` converts a set of world blocks into a new `ServerShip` with those blocks placed in the shipyard.
+
+```kotlin
+import org.valkyrienskies.mod.common.assembly.ShipAssembler
+
+val blocks: Set<BlockPos> = /* block positions to assemble */
+val newShip: ServerShip = ShipAssembler.assembleToShip(serverLevel, blocks)
+```
+
+The ship's initial position in world space is derived from the centroid of `blocks`. The original blocks are removed from the world and placed on the new ship.
+
+```kotlin
+// Assemble at half scale
+val scaledShip: ServerShip = ShipAssembler.assembleToShip(serverLevel, blocks, scale = 0.5)
+```
+
+<Warning>
+  `assembleToShip` is annotated `@GameTickOnly`. Call it only from the main game thread (e.g., inside a block interaction handler or a server tick event).
+</Warning>
+
+## Physics thread access (PhysShip)
+
+To apply forces to a ship, implement `BlockEntityPhysicsListener` and use the `PhysShip` parameter passed to `physTick`. `PhysShip` is a separate interface from `ServerShip` and is only valid during `physTick`.
+
+```kotlin
+import org.valkyrienskies.mod.api.BlockEntityPhysicsListener
+import org.valkyrienskies.core.api.ships.PhysShip
+import org.valkyrienskies.core.api.world.PhysLevel
+
+class ThrusterBlockEntity : BlockEntity(...), BlockEntityPhysicsListener {
+
+    override var dimension: DimensionId = ""
+
+    override fun physTick(physShip: PhysShip?, physLevel: PhysLevel) {
+        if (physShip == null) return // block is not on a ship
+        // Apply a force in world space
+        physShip.applyInvariantForce(Vector3d(0.0, 50000.0, 0.0))
+    }
+}
+```
+
+Register the block entity with the VS2 phys tick system:
+
+```kotlin
+// In BlockEntity.onLoad (server side)
+ValkyrienSkiesMod.addBlockEntityPhysTicker(dimensionId, blockPos, this)
+
+// In BlockEntity.setRemoved
+ValkyrienSkiesMod.removeBlockEntityPhysTicker(blockPos, dimensionId)
+```
+
+<Warning>
+  Do not access non-volatile `BlockEntity` fields from `physTick`. The physics thread runs concurrently with the game thread. Use atomic variables or concurrent queues to pass data between ticks.
+</Warning>
+
+## Deleting a ship
+
+```kotlin
+import org.valkyrienskies.mod.common.assembly.ShipAssembler
+
+// Delete the ship and optionally its blocks
+ShipAssembler.deleteShip(serverLevel, serverShip, deleteBlocks = true, dropBlocks = false)
+```

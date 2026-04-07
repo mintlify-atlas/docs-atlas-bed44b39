@@ -1,0 +1,75 @@
+---
+title: "Installation"
+description: "Install Valkyrien Skies 2 on Fabric, Quilt, or Forge for Minecraft 1.20.1."
+keywords: ["install", "valkyrien skies", "fabric", "forge", "quilt", "curseforge", "modrinth"]
+---
+
+Valkyrien Skies 2 supports **Minecraft 1.20.1** on Fabric, Quilt, and Forge. Follow the steps for your mod loader below.
+
+## Download
+
+You can download VS2 from either of the official distribution platforms:
+
+- [CurseForge](https://www.curseforge.com/minecraft/mc-mods/valkyrien-skies)
+- [Modrinth](https://modrinth.com/mod/valkyrien-skies)
+
+<Note>
+  Always download VS2 from CurseForge or Modrinth. Do not use third-party mirrors.
+</Note>
+
+## Installation steps
+
+<Tabs>
+  <Tab title="Fabric / Quilt">
+    <Steps>
+      <Step title="Install a Fabric or Quilt loader">
+        Download and run the [Fabric installer](https://fabricmc.net/use/installer/) or [Quilt installer](https://quiltmc.org/en/install/) for Minecraft 1.20.1.
+
+        - Fabric loader version: **0.17.2** or newer
+      </Step>
+      <Step title="Install Fabric API or Quilted Fabric API">
+        VS2 depends on Architectury API (version **9.1.12**), which in turn requires Fabric API. Download it from CurseForge or Modrinth and place it in your `mods/` folder.
+      </Step>
+      <Step title="Install Architectury API">
+        Download [Architectury API 9.1.12](https://www.curseforge.com/minecraft/mc-mods/architectury-api) for Fabric/Quilt 1.20.1 and place it in your `mods/` folder.
+      </Step>
+      <Step title="Add the VS2 jar">
+        Download the VS2 jar for **Fabric** (or **Quilt**) from CurseForge or Modrinth and place it in your `mods/` folder.
+      </Step>
+      <Step title="Launch the game">
+        Start Minecraft through your launcher. VS2 should appear in the mod list on the main menu.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Forge">
+    <Steps>
+      <Step title="Install Forge">
+        Download and run the [Forge installer](https://files.minecraftforge.net/) for version **1.20.1-47.4.2**.
+      </Step>
+      <Step title="Install KotlinForForge">
+        VS2 is written in Kotlin and requires KotlinForForge. Download the version listed in the VS2 release notes and place it in your `mods/` folder.
+
+        <Warning>
+          VS2 will not start on Forge without KotlinForForge. Check the specific version required against the VS2 release you are using.
+        </Warning>
+      </Step>
+      <Step title="Install Architectury API">
+        Download [Architectury API 9.1.12](https://www.curseforge.com/minecraft/mc-mods/architectury-api) for Forge 1.20.1 and place it in your `mods/` folder.
+      </Step>
+      <Step title="Add the VS2 jar">
+        Download the VS2 jar for **Forge** from CurseForge or Modrinth and place it in your `mods/` folder.
+      </Step>
+      <Step title="Launch the game">
+        Start Minecraft through the Forge profile in your launcher. VS2 should appear in the mod list on the main menu.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Verifying the installation
+
+Once in-game, open the mod list (the **Mods** button on the main menu if using Forge, or check your launcher's mod list). You should see **Valkyrien Skies** listed. If VS2 failed to load, check the logs in `.minecraft/logs/latest.log` for error messages.
+
+<Tip>
+  If you are building a modpack that includes VS2, prefer to also include addon mods such as Eureka Ships or Clockwork so players have a way to create ships out of the box. VS2 alone provides the physics engine but no player-facing ship-building UI.
+</Tip>

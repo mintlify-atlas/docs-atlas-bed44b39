@@ -1,0 +1,77 @@
+---
+title: 'Events & listeners overview'
+description: 'Hook into physics ticks, ship assembly, and render events using the VS2 event and listener system.'
+---
+
+VS2 provides three categories of hooks that other mods can use to react to physics simulation events, ship assembly, and rendering.
+
+## Categories
+
+### Physics tick listeners
+
+`BlockEntityPhysicsListener` and `EntityPhysicsListener` are interfaces that block entities and entities implement to receive a callback on every physics tick.
+
+<Warning>
+  Physics tick listeners run on the **physics thread**, not the main game thread. Never read or write non-thread-safe state (regular block entity fields, level references, etc.) from inside `physTick`. Use `AtomicReference`, `ConcurrentLinkedQueue`, or other thread-safe primitives to pass data between the game tick and the physics tick.
+</Warning>
+
+**Registration — block entities:**
+
+```kotlin
+// Inside BlockEntity.onLoad / setLevel
+ValkyrienSkiesMod.addBlockEntityPhysTicker(dimensionId, blockPos, this)
+
+// Inside BlockEntity.setRemoved
+ValkyrienSkiesMod.removeBlockEntityPhysTicker(blockPos, dimensionId)
+```
+
+**Registration — entities:**
+
+```kotlin
+// When the entity is added to the world
+ValkyrienSkiesMod.addEntityPhysTicker(dimensionId, entity)
+
+// When the entity is removed
+ValkyrienSkiesMod.removeEntityPhysTicker(entity, dimensionId)
+```
+
+### Assembly events
+
+`VSAssemblyEvents` is a static object that emits events during the ship assembly and disassembly process. Listeners can store and read cross-event data through a shared `tempData` map.
+
+```kotlin
+VSAssemblyEvents.beforeCopy.on { event -> /* ... */ }
+VSAssemblyEvents.onPasteBeforeBlocksAreLoaded.on { event -> /* ... */ }
+VSAssemblyEvents.onPasteAfterBlocksAreLoaded.on { event -> /* ... */ }
+```
+
+### API events via `vsApi`
+
+Three events are available on the `VsApi` interface, accessed through the `vsApi` singleton:
+
+| Event | Stability | When it fires |
+|---|---|---|
+| `registerBlockStateEvent` | `@Experimental` | Startup — register physics representations for block states |
+| `preRenderShipEvent` | `@Experimental` | Client — before a ship is rendered each frame |
+| `postRenderShipEvent` | `@Experimental` | Client — after a ship is rendered each frame |
+
+```kotlin
+vsApi.registerBlockStateEvent.on { event ->
+    event.register(myBlock.defaultBlockState(), event.buildSolidState { /* ... */ })
+}
+```
+
+<Note>
+  All three API events are annotated `@Experimental` and may change in future releases.
+</Note>
+
+## Detail pages
+
+<CardGroup cols={2}>
+  <Card title="BlockEntityPhysicsListener" icon="cube" href="/api/events/block-entity-physics">
+    Physics tick callbacks for block entities and entities, with thread-safety guidance and registration patterns.
+  </Card>
+  <Card title="Assembly events" icon="wrench" href="/api/events/assembly-events">
+    Hooks into the ship assembly lifecycle: `beforeCopy`, `onPasteBeforeBlocksAreLoaded`, and `onPasteAfterBlocksAreLoaded`.
+  </Card>
+</CardGroup>

@@ -1,0 +1,221 @@
+---
+title: "Data generation"
+description: "Generate VS2 data pack JSON files for block mass, friction, elasticity, and shipyard entity configuration."
+---
+
+VS2 reads block physics properties — mass, friction, and elasticity — from data packs at runtime. Instead of writing the JSON by hand, you can use the two provided `DataProvider` base classes to generate them with Gradle's data generation task.
+
+---
+
+## Block info: `VSBlockInfoDataProvider`
+
+Extend `VSBlockInfoDataProvider` and implement `registerEntries()` to declare the physics properties of your blocks. Gradle will write the output to:
+
+```
+data/valkyrienskies/vs_mass/<modId>.json
+```
+
+### Class reference
+
+```kotlin
+// org.valkyrienskies.mod.api.datagen.VSBlockInfoDataProvider
+
+abstract class VSBlockInfoDataProvider(
+    val output: PackOutput,
+    val modId: String
+) : DataProvider {
+
+    /** Implement this method and call addBlock / addBlockTag inside it. */
+    protected abstract fun registerEntries()
+
+    /**
+     * Registers a single block by ResourceLocation.
+     * All parameters except [id] are optional; omitted values are not written to JSON.
+     *
+     * @param id          The block's registry ID.
+     * @param mass        Mass in kilograms.
+     * @param friction    Friction coefficient (0.0–1.0).
+     * @param elasticity  Elasticity/bounciness coefficient (0.0–1.0).
+     * @param priority    Higher values override entries with lower values. Useful for compat.
+     */
+    protected fun addBlock(
+        id: ResourceLocation,
+        mass: Double? = null,
+        friction: Double? = null,
+        elasticity: Double? = null,
+        priority: Int? = null
+    )
+
+    /** Overload that accepts a [Block] directly. */
+    protected fun addBlock(
+        block: Block,
+        mass: Double? = null,
+        friction: Double? = null,
+        elasticity: Double? = null,
+        priority: Int? = null
+    )
+
+    /**
+     * Registers all blocks matching a tag.
+     * Individual block entries override tag entries when both are present.
+     */
+    protected fun addBlockTag(
+        id: ResourceLocation,
+        mass: Double? = null,
+        friction: Double? = null,
+        elasticity: Double? = null,
+        priority: Int? = null
+    )
+
+    /** Overload that accepts a [TagKey<Block>] directly. */
+    protected fun addBlockTag(
+        tag: TagKey<Block>,
+        mass: Double? = null,
+        friction: Double? = null,
+        elasticity: Double? = null,
+        priority: Int? = null
+    )
+}
+```
+
+### Priority
+
+Higher `priority` values override lower ones. Use this when writing compatibility entries for another mod's blocks — set a higher priority than the defaults so your values win.
+
+### Complete example
+
+```kotlin
+import net.minecraft.data.PackOutput
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.level.block.Blocks
+import org.valkyrienskies.mod.api.datagen.VSBlockInfoDataProvider
+
+class MyModBlockInfoProvider(output: PackOutput) :
+    VSBlockInfoDataProvider(output, "mymod") {
+
+    override fun registerEntries() {
+        // Register a single block by Block reference
+        addBlock(
+            block = Blocks.IRON_BLOCK,
+            mass = 800.0,
+            friction = 0.6,
+            elasticity = 0.1
+        )
+
+        // Register a block by ResourceLocation
+        addBlock(
+            id = ResourceLocation("mymod", "steel_plate"),
+            mass = 1200.0,
+            friction = 0.5,
+            elasticity = 0.05,
+            priority = 10
+        )
+
+        // Register an entire tag — all matching blocks get these defaults
+        addBlockTag(
+            id = ResourceLocation("mymod", "light_panels"),
+            mass = 50.0,
+            friction = 0.3,
+            elasticity = 0.2
+        )
+    }
+}
+```
+
+---
+
+## Registering with the data generator
+
+<Tabs>
+  <Tab title="Fabric">
+
+```kotlin
+// In your DataGeneratorEntrypoint implementation:
+override fun onInitializeDataGenerator(fabricDataGenerator: FabricDataGenerator) {
+    val pack = fabricDataGenerator.createPack()
+    pack.addProvider(::MyModBlockInfoProvider)
+    pack.addProvider(::MyModShipyardEntityProvider) // if needed
+}
+```
+
+  </Tab>
+  <Tab title="Forge">
+
+```kotlin
+// Subscribe to the GatherDataEvent:
+@SubscribeEvent
+fun onGatherData(event: GatherDataEvent) {
+    val gen = event.generator
+    val output = gen.packOutput
+    gen.addProvider(event.includeServer(), MyModBlockInfoProvider(output))
+    gen.addProvider(event.includeServer(), MyModShipyardEntityProvider(output)) // if needed
+}
+```
+
+  </Tab>
+</Tabs>
+
+---
+
+## Shipyard entity config: `VSShipyardEntityDataProvider`
+
+VS2 controls which entity types are allowed to exist in the shipyard dimension. Use `VSShipyardEntityDataProvider` to declare that your entities should be handled by the shipyard.
+
+The output is written to:
+
+```
+data/<entityNamespace>/vs_entities/<entityPath>.json
+```
+
+Each entity gets its own JSON file with the content:
+
+```json
+{ "handler": "valkyrienskies:shipyard" }
+```
+
+### Class reference
+
+```kotlin
+// org.valkyrienskies.mod.api.datagen.VSShipyardEntityDataProvider
+
+abstract class VSShipyardEntityDataProvider(
+    val output: PackOutput,
+    val modId: String
+) : DataProvider {
+
+    /** Implement this method and call addEntity inside it. */
+    protected abstract fun registerEntries()
+
+    /** Registers an entity type by ResourceLocation. */
+    protected fun addEntity(id: ResourceLocation)
+
+    /** Overload that accepts an [EntityType] directly. */
+    protected fun addEntity(type: EntityType<*>)
+}
+```
+
+### Complete example
+
+```kotlin
+import net.minecraft.data.PackOutput
+import net.minecraft.world.entity.EntityType
+import org.valkyrienskies.mod.api.datagen.VSShipyardEntityDataProvider
+
+class MyModShipyardEntityProvider(output: PackOutput) :
+    VSShipyardEntityDataProvider(output, "mymod") {
+
+    override fun registerEntries() {
+        // Allow a vanilla entity in the shipyard
+        addEntity(EntityType.ITEM_FRAME)
+
+        // Allow a custom entity by ResourceLocation
+        addEntity(ResourceLocation("mymod", "my_custom_entity"))
+    }
+}
+```
+
+<Note>
+  You only need `VSShipyardEntityDataProvider` if your mod adds entities that
+  players should be able to place or interact with inside a ship. Most mods do
+  not need it.
+</Note>

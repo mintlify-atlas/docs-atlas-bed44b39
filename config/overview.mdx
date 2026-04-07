@@ -1,0 +1,158 @@
+---
+title: "Configuration"
+description: "All VS2 configuration options across the Client, Server, and Common config categories."
+---
+
+VS2 splits its configuration into three categories: **Client**, **Server**, and **Common**. Client options are per-player and live in the client's config file. Server options are controlled by the server operator. Common options apply to both sides.
+
+Permission levels for commands are documented in [Commands reference](/commands/overview).
+
+<Tabs>
+  <Tab title="Client">
+
+Client config controls rendering, UI, sound, and connectivity settings that apply only to the local player.
+
+### General
+
+| Option | Default | Description |
+|---|---|---|
+| `renderDebugText` | `false` | Show a VS2 debug HUD overlay displaying server TPS and other diagnostics. |
+| `sealedAreaCameraGracePeriod` | `2` | Ticks before the camera is considered to have left a sealed area. Increase if camera detection feels too sensitive. |
+| `recommendSlugsInMcCommands` | `true` | Suggest ship slugs in vanilla commands such as `/tp` where player names would normally appear. Disable if ship slugs pollute your autocomplete. |
+| `defaultRenderer` | `VANILLA` | How ships are rendered by default. Currently `VANILLA` is the only supported value. |
+
+### Tooltips
+
+| Option | Default | Description |
+|---|---|---|
+| `Tooltip.massTooltipVisibility` | `ADVANCED` | When the mass tooltip is shown. `ADVANCED` shows it only in advanced tooltip mode (hold Shift in vanilla). |
+| `Tooltip.useImperialUnits` | `false` | Display mass in pounds (lb) instead of kilograms (kg). |
+
+### Block tinting
+
+| Option | Default | Description |
+|---|---|---|
+| `BlockTinting.fixBlockTinting` | `false` | Partially corrects block tint rendering issues on ships (e.g. grass color). Enable if you see incorrect biome tints on ship blocks. |
+
+### Sound effects
+
+| Option | Default | Description |
+|---|---|---|
+| `SoundEffect.enableDopplerEffect` | `true` | Apply the Doppler effect to sounds emitted by moving ships. |
+| `SoundEffect.dopplerEffectScale` | `0.05` (1/20) | Strength of the Doppler effect. `1.0` is physically realistic; lower values reduce the effect. |
+
+### Connectivity
+
+| Option | Default | Description |
+|---|---|---|
+| `Connectivity.enableClientConnectivity` | `false` | Enable client-side sealed-space detection. When enabled, VS2 can occlude water visuals inside a sealed structure (e.g. a submarine). Increases client-side load. |
+
+  </Tab>
+  <Tab title="Server">
+
+Server config controls physics behavior, mod compatibility, and command permissions. Edited by the server operator.
+
+### General
+
+| Option | Default | Description |
+|---|---|---|
+| `enableInteractDistanceChecks` | `true` | Enforce vanilla interact-distance checks on ships. Disable for very large ships where the block origin is farther from the nearest face than the check permits. |
+| `enablePocketBuoyancy` | `false` | Enable buoyancy from enclosed air pockets inside a ship. Requires a sealed hull to function. |
+| `buoyancyFactorPerPocketVolume` | `0.05` | Buoyancy force added per cubic meter of enclosed air pocket. Only applies when `enablePocketBuoyancy` is `true`. |
+| `transformTeleports` | `true` | Redirect teleportation into a ship's shipyard region to the ship itself in the world. |
+| `enableMovementChecks` | `false` | Apply vanilla movement-validation checks to players on ships. Disable (default) to prevent "moved too quickly" rubber-banding on moving ships. |
+| `teleportReconnectedPlayers` | `true` | When a player reconnects, teleport them to the position on the ship they occupied when they disconnected, accounting for any ship movement. |
+| `saveMobsPositionOnShip` | `true` | When a mob unloads while on a ship, save its relative position so it is placed correctly when it loads back in. Prevents mobs from falling off ships. |
+| `preventFluidEscapingShip` | `true` | Stop water and other fluids from flowing out of a ship's bounding box. |
+| `preventVinesEscapingShip` | `true` | Stop vines from growing beyond a ship's bounding box. |
+| `explosionBlastForce` | `500000.0` | Force in newtons applied by a TNT explosion at its center. |
+| `allowMobSpawns` | `true` | Allow natural mob spawning on ships. |
+| `aiOnShips` | `true` | Enable rudimentary mob pathfinding on ships. |
+| `miniShipSize` | `0.5` | Scale factor used when creating mini ships. |
+| `minScaling` | `0.25` | Minimum scale a ship can be set to via `/vs scale`. |
+| `defaultBlockMass` | `1000.0` | Mass in kilograms assigned to blocks that have no mass defined in data or code. Blocks with a mass below 100 float in water. |
+| `defaultBlockElasticity` | `0.3` | Default elasticity coefficient. Higher values make blocks bouncier on collision. |
+| `defaultBlockFriction` | `0.5` | Default friction coefficient. Lower values make blocks more slippery. |
+| `defaultBlockHardness` | `1.0` | Default block hardness (placeholder, unused). |
+| `enableWorldSplitting` | `false` | Enable ship splitting in worldspace. Experimental. |
+| `defaultSplitGraceTimer` | `2` | Ticks after a block break before a split is evaluated. Setting this too high may prevent explosions from properly splitting ships. |
+
+### Commands
+
+Permission levels are integers from `0` (all players) to `4` (server owner). They control which operator level can run each `/vs` command.
+
+| Option | Default | Command |
+|---|---|---|
+| `Commands.deleteShipCommandPerms` | `2` | `/vs delete`, `/vs splitting` |
+| `Commands.getShipCommandPerms` | `0` | `/vs get-ship` |
+| `Commands.getAirValuesPerms` | `0` | `/vs get-air`, `/vs get-gravity` |
+| `Commands.renameShipCommandPerms` | `2` | `/vs rename` |
+| `Commands.remassShipCommandPerms` | `2` | `/vs remass` |
+| `Commands.scaleShipCommandPerms` | `2` | `/vs scale` |
+| `Commands.setStaticShipCommandPerms` | `2` | `/vs set-static` |
+| `Commands.teleportShipCommandPerms` | `2` | `/vs teleport` |
+| `Commands.changeBackendCommandPerms` | `4` | `/vs backend` |
+| `Commands.dryShipCommandPerms` | `2` | `/vs dry` |
+
+### FTB Chunks
+
+Requires the [FTB Chunks](https://www.curseforge.com/minecraft/mc-mods/ftb-chunks-forge) mod.
+
+| Option | Default | Description |
+|---|---|---|
+| `FTBChunks.shipsProtectedByClaims` | `true` | Prevent non-members from interacting with ships that are within a claimed chunk. |
+| `FTBChunks.shipsProtectionOutOfBuildHeight` | `false` | Extend claim protection to ships above or below the world's build height limits. |
+
+### ComputerCraft
+
+Requires the [ComputerCraft](https://www.curseforge.com/minecraft/mc-mods/cc-tweaked) mod.
+
+| Option | Default | Description |
+|---|---|---|
+| `ComputerCraft.canTurtlesLeaveScaledShips` | `false` | Allow turtles to move off ships that have a non-default scale. Leaving scaled ships can cause positional issues, so this is disabled by default. |
+
+### Weather 2
+
+Requires the [Weather 2](https://www.curseforge.com/minecraft/mc-mods/weather-storms-tornadoes) mod.
+
+| Option | Default | Description |
+|---|---|---|
+| `Weather2.enableWeatherCompat` | `true` | Allow Weather 2 wind to apply forces to VS ships. |
+| `Weather2.windMultiplier` | `0.1` | Scale factor for how strongly Weather 2 wind affects ships. |
+| `Weather2.windMaxVel` | `20.0` | Maximum velocity (m/s) a ship can reach from wind forces. |
+| `Weather2.stormRange` | `150.0` | Distance within which storms affect VS ships. |
+| `Weather2.stormDampening` | `0.0` | Dampening applied to storm effects on VS ships. |
+
+### Dynmap
+
+Requires the [Dynmap](https://www.curseforge.com/minecraft/mc-mods/dynmapforge) mod.
+
+| Option | Default | Description |
+|---|---|---|
+| `Dynmap.showIconMarkers` | `true` | Show each ship as an icon marker on the Dynmap web map. |
+| `Dynmap.showPolylineMarkers` | `true` | Show each ship's bounding outline as a polyline on the Dynmap web map. |
+| `Dynmap.showShipId` | `true` | Include the ship's numeric ID in its Dynmap marker label. |
+| `Dynmap.showShipMass` | `true` | Include the ship's mass in its Dynmap marker label. |
+
+### CBC (Cannons BC)
+
+Requires the [Cannons](https://www.curseforge.com/minecraft/mc-mods/cannons) mod.
+
+| Option | Default | Description |
+|---|---|---|
+| `CBC.shellRecoil` | `false` | Apply a recoil force to a ship when one of its cannons fires. |
+| `CBC.shellRecoilMult` | `500000.0` | Force multiplier for cannon recoil. Only applies when `shellRecoil` is `true`. |
+
+  </Tab>
+  <Tab title="Common">
+
+Common config contains advanced options that may need to be set on both client and server to take effect.
+
+### Advanced
+
+| Option | Default | Description |
+|---|---|---|
+| `ADVANCED.renderPathfinding` | `false` | Render mob pathfinding debug nodes on ships. Must be set on both client and server. Also requires the JVM system property `-Dorg.valkyrienskies.render_pathfinding=true` to be set at launch. |
+
+  </Tab>
+</Tabs>

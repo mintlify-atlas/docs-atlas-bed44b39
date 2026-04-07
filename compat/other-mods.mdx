@@ -1,0 +1,85 @@
+---
+title: "Other Mod Compatibility"
+description: "Valkyrien Skies 2 compatibility with Dynmap, Hex Casting, FTB Chunks, Weather 2, and more."
+---
+
+Valkyrien Skies 2 has built-in compatibility with a number of popular mods. Below is an overview of each integration.
+
+## Dynmap
+
+VS2 ships appear on [Dynmap](https://modrinth.com/plugin/dynmap) maps automatically. Each ship can be shown as an icon marker and/or a polyline marker representing its bounds.
+
+Configure ship display in your server config:
+
+```toml
+[Dynmap]
+showIconMarkers = true       # Show a pin icon at the ship's position
+showPolylineMarkers = true   # Show the ship's outline as a polyline
+showShipId = true            # Include the ship's internal ID in the label
+showShipMass = true          # Include the ship's mass in the label
+```
+
+## Hex Casting
+
+VS2 ships are registered as entities in [Hex Casting](https://modrinth.com/mod/hex-casting) (0.11.3), [Hexal](https://modrinth.com/mod/hexal) (0.3.1), and [Hextweaks](https://modrinth.com/mod/hextweaks). This allows hex patterns to target and interact with ship entities.
+
+Compatibility issues with Hexal and Hextweaks were fixed in VS **2.4.11**.
+
+<Note>
+  [Hexical](https://modrinth.com/mod/hexical) is also supported via the `hexical` entity data entries.
+</Note>
+
+## Connectable Chains
+
+[Connectable Chains](https://modrinth.com/mod/connectible_chains) work across ship boundaries. Chains attached between a ship block and a world block (or between two ships) stretch and behave correctly as the ship moves.
+
+## FTB Chunks
+
+Ships can be protected by [FTB Chunks](https://www.curseforge.com/minecraft/mc-mods/ftb-chunks) land claims. Configure this behavior in your server config:
+
+```toml
+[FTBChunks]
+# Protect ships within chunk claims (default: true)
+shipsProtectedByClaims = true
+
+# Protect ships that extend outside build height limits (default: false)
+shipsProtectionOutOfBuildHeight = false
+```
+
+## Weather 2
+
+[Weather 2](https://www.curseforge.com/minecraft/mc-mods/weather-storms-tornadoes) storms affect VS2 ships. Wind force is applied to ships within storm range. Configure the effect in your server config:
+
+```toml
+[Weather2]
+enableWeatherCompat = true   # Apply Weather 2 wind forces to ships
+windMultiplier = 0.1         # Wind force multiplier
+windMaxVel = 20.0            # Maximum ship velocity from wind (m/s)
+stormRange = 150.0           # Radius in which storms affect ships
+stormDampening = 0.0         # Dampening applied to ship from storm
+```
+
+## Flywheel / Embeddium
+
+VS2 includes a Flywheel compatibility layer for optimized rendering of ships when [Flywheel](https://modrinth.com/mod/flywheel) is present. Ship rendering falls back to vanilla if Flywheel is not installed.
+
+## Optifine
+
+VS2 has special mixin handling for OptiFine's render pipeline to ensure ships render correctly when OptiFine is installed.
+
+## Summary
+
+<CardGroup cols={2}>
+  <Card title="Dynmap" icon="map" href="/compat/other-mods#dynmap">
+    Ships appear as markers on your server's live map.
+  </Card>
+  <Card title="Hex Casting" icon="wand-magic-sparkles" href="/compat/other-mods#hex-casting">
+    Ships are accessible as entities in hex patterns.
+  </Card>
+  <Card title="FTB Chunks" icon="shield" href="/compat/other-mods#ftb-chunks">
+    Chunk claims can protect ships from griefing.
+  </Card>
+  <Card title="Weather 2" icon="cloud-bolt" href="/compat/other-mods#weather-2">
+    Storm winds push and buffet your ships.
+  </Card>
+</CardGroup>

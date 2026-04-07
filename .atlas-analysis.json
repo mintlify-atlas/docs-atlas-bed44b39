@@ -1,24 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Valkyrien Skies",
+  "projectType": "framework",
+  "projectName": "Valkyrien Skies",
+  "projectDescription": "A Minecraft mod framework that provides a physics simulation engine enabling other mods to create ships, aircraft, and other moving structures with realistic physics, buoyancy, and collision.",
   "theme": "maple",
-  "colors": {
-    "primary": "#88562e",
-    "light": "#decfa0",
-    "dark": "#a9abad"
-  },
-  "favicon": "https://media.brand.dev/5bc4628d-0e75-4df9-ad53-1be4c21f73c3.png",
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/ValkyrienSkies/Valkyrien-Skies-2"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/ValkyrienSkies/Valkyrien-Skies-2"
-    }
-  },
+  "primaryColor": "#88562e",
+  "lightColor": "#decfa0",
+  "darkColor": "#a9abad",
   "navigation": {
     "tabs": [
       {
@@ -97,5 +84,29 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Physics-based ships and moving structures in Minecraft",
+    "Ship assembly and disassembly API for mod developers",
+    "Buoyancy simulation with air pocket support",
+    "Multi-loader support (Fabric, Quilt, Forge)",
+    "Block mass/friction/elasticity data pack system",
+    "Mod compatibility with Create, ComputerCraft, Dynmap, Hex Casting, and more",
+    "BlockEntityPhysicsListener for physics-thread block entity callbacks",
+    "Coordinate space utilities for ship-world transformations"
+  ],
+  "publicApiSurface": [
+    "VsApi interface (getServerShipWorld, getClientShipWorld, getShipManagingBlock, getShipsIntersecting)",
+    "vsApi singleton (org.valkyrienskies.mod.api.ValkyrienSkies)",
+    "BlockEntityPhysicsListener interface",
+    "EntityPhysicsListener interface",
+    "ShipAssembler.assembleToShip / assembleToShipFull",
+    "RegisterBlockStateEvent (register solid/liquid physics block states)",
+    "VSBlockInfoDataProvider (data generator for block mass/friction/elasticity)",
+    "VSShipyardEntityDataProvider (data generator for shipyard entity data)",
+    "ShipSettings attachment (per-ship configuration)",
+    "VSAssemblyEvents (beforeCopy, onPasteBeforeBlocksAreLoaded, onPasteAfterBlocksAreLoaded)",
+    "Level extension functions: getShipManagingBlock, getShipsIntersecting, positionToNearbyShips",
+    "/vs commands: delete, rename, scale, teleport, static, splitting, getship, getair, getgravity, remass"
+  ]
 }

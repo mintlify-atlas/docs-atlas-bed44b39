@@ -1,0 +1,128 @@
+---
+title: "Block physics registration"
+description: "Register physics shapes for your blocks so VS2 can simulate collisions and buoyancy correctly."
+---
+
+VS2 runs a physics simulation that needs to know the solid shape and fluid properties of every block it encounters. By default, VS2 infers these from Minecraft's existing collision shapes, but you can override them — or register entirely custom shapes — using the `RegisterBlockStateEvent`.
+
+<Note>
+  `RegisterBlockStateEvent` is annotated `@Experimental`. Its API may change in
+  future VS2 releases. Subscribe to VS2's changelog or GitHub releases to stay
+  informed of breaking changes.
+</Note>
+
+---
+
+## When the event fires
+
+The event fires once at startup (before the first world is loaded) on the server side. It is the only time block states can be registered with the physics engine.
+
+---
+
+## Subscribing to the event
+
+Access the event through `vsApi.registerBlockStateEvent` and call `.on { }` with your registration logic:
+
+```kotlin
+import org.valkyrienskies.mod.api.vsApi
+
+// Call this during your mod's initialization, before the first world loads.
+vsApi.registerBlockStateEvent.on { event ->
+    // Register your block states here.
+}
+```
+
+---
+
+## Registering a solid block
+
+Use `event.buildSolidState { ... }` to construct a `SolidState` and pass it to `event.register`:
+
+```kotlin
+vsApi.registerBlockStateEvent.on { event ->
+    val solidState = event.buildSolidState {
+        // Configure the solid physics shape using the builder DSL.
+        // (Properties such as mass, friction, and shape type are set here.)
+    }
+
+    // Register every variant of a block state you want to override.
+    val blockState = MyBlocks.MY_BLOCK.defaultBlockState()
+    event.register(blockState, solidState)
+}
+```
+
+---
+
+## Registering a liquid block
+
+Use `event.buildLiquidState { ... }` to construct a `LiquidState`:
+
+```kotlin
+vsApi.registerBlockStateEvent.on { event ->
+    val liquidState = event.buildLiquidState {
+        // Configure buoyancy, density, and fluid properties here.
+    }
+
+    val blockState = MyBlocks.MY_FLUID_BLOCK.defaultBlockState()
+    event.register(blockState, liquidState)
+}
+```
+
+---
+
+## Registering both solid and liquid (waterlogged blocks)
+
+Some blocks — such as a waterlogged chest — have both a solid physics shape and a liquid volume. Pass both states to the three-argument overload:
+
+```kotlin
+vsApi.registerBlockStateEvent.on { event ->
+    val solidState = event.buildSolidState {
+        // Chest collision shape
+    }
+    val liquidState = event.buildLiquidState {
+        // Water fill inside the chest
+    }
+
+    // Register both states for the waterlogged variant.
+    val waterloggedState = Blocks.CHEST.defaultBlockState()
+        .setValue(BlockStateProperties.WATERLOGGED, true)
+
+    event.register(waterloggedState, liquidState, solidState)
+}
+```
+
+---
+
+## `RegisterBlockStateEvent` interface reference
+
+```kotlin
+// org.valkyrienskies.mod.api.events.RegisterBlockStateEvent
+
+interface RegisterBlockStateEvent {
+
+    // Builder factories
+    fun newLiquidStateBuilder(): LiquidState.Builder
+    fun buildLiquidState(block: LiquidState.Builder.() -> Unit): LiquidState
+
+    fun newSolidStateBuilder(): SolidState.Builder
+    fun buildSolidState(block: SolidState.Builder.() -> Unit): SolidState
+
+    // Registration overloads
+    fun register(state: BlockState, solidState: SolidState)
+    fun register(state: BlockState, liquidState: LiquidState)
+
+    /**
+     * Registers a BlockState with both a LiquidState and a SolidState —
+     * useful for waterlogged blocks such as a waterlogged chest.
+     */
+    fun register(state: BlockState, liquidState: LiquidState, solidState: SolidState)
+}
+```
+
+---
+
+## Tips
+
+- You must register each `BlockState` variant individually if the shape differs per variant (e.g., a slab with `HALF = TOP` vs `HALF = BOTTOM`).
+- If you do not register a block state, VS2 falls back to its own default behavior for that block.
+- Registration is additive: other mods (and VS2 itself) may also register states. If two registrations conflict, the last one registered wins for that specific `BlockState`.

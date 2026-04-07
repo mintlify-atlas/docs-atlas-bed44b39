@@ -1,0 +1,145 @@
+---
+title: 'Physics simulation'
+description: 'How VS2 runs its physics engine on a separate thread, how game and physics ticks relate, and how to hook into the physics loop from block entities and entities.'
+keywords: ['physics', 'PhysShip', 'physTick', 'PhysTickOnly', 'GameTickOnly', 'BlockEntityPhysicsListener', 'EntityPhysicsListener', 'GameToPhysicsAdapter', 'forces', 'thread safety']
+---
+
+VS2 runs its physics simulation on a dedicated thread that ticks at a higher rate than the Minecraft game tick. This gives ships smooth, high-frequency motion even when the server TPS drops.
+
+## Thread model
+
+| Thread | Tick rate | Annotation |
+|---|---|---|
+| **Game thread** | ~20 TPS (server tick) | `@GameTickOnly` |
+| **Physics thread** | Higher than game tick | `@PhysTickOnly` |
+
+Code annotated `@PhysTickOnly` must only execute on the physics thread. Code annotated `@GameTickOnly` must only execute on the game thread. Mixing them without explicit synchronization is a data race.
+
+<Warning>
+Never read or write non-`@Volatile` / non-atomic block entity fields from `physTick`. The physics thread and the game thread run concurrently. Use `@Volatile` fields, `AtomicReference`, or `ConcurrentLinkedQueue` to pass state between them.
+</Warning>
+
+## BlockEntityPhysicsListener
+
+Block entities that need per-physics-tick updates implement `BlockEntityPhysicsListener`:
+
+```kotlin BlockEntityPhysicsListener.kt
+/**
+ * Block entities that want physics-thread updates implement this interface.
+ * Receives a PhysShip if the block entity is on a ship, or null if it is in the world.
+ *
+ * Do not access non-volatile/atomic Block Entity variables from physTick.
+ */
+@PhysTickOnly
+interface BlockEntityPhysicsListener {
+    fun physTick(physShip: PhysShip?, physLevel: PhysLevel)
+    var dimension: DimensionId
+}
+```
+
+Register and unregister the listener in `onLoad` / `setRemoved`:
+
+```kotlin
+class MyThrusterBlockEntity(pos: BlockPos, state: BlockState)
+    : BlockEntity(MY_TYPE, pos, state), BlockEntityPhysicsListener {
+
+    override var dimension: DimensionId = ""
+
+    override fun onLoad() {
+        super.onLoad()
+        val level = level ?: return
+        dimension = level.dimensionId
+        ValkyrienSkiesMod.addBlockEntityPhysTicker(dimension, blockPos, this)
+    }
+
+    override fun setRemoved() {
+        super.setRemoved()
+        ValkyrienSkiesMod.removeBlockEntityPhysTicker(blockPos, dimension)
+    }
+
+    @PhysTickOnly
+    override fun physTick(physShip: PhysShip?, physLevel: PhysLevel) {
+        // physShip is non-null when this block entity is inside a ship
+        physShip?.applyModelForce(thrustVector, blockPos.center.toJOML()) ?: return
+    }
+}
+```
+
+## EntityPhysicsListener
+
+Entities that ride ships or otherwise need physics-tick callbacks implement `EntityPhysicsListener`:
+
+```kotlin EntityPhysicsListener.kt
+/**
+ * Entities that want updates on the Physics Thread implement this interface.
+ * Do not access non-volatile/atomic Entity variables from physTick.
+ */
+interface EntityPhysicsListener {
+    fun physTick(physLevel: PhysLevel)
+    var dimension: DimensionId
+}
+```
+
+Register with `ValkyrienSkiesMod.addEntityPhysTicker` and unregister with `removeEntityPhysTicker`.
+
+## Applying forces with PhysShip
+
+`PhysShip` is the physics-thread handle to a ship. Forces applied here are consumed at the start of the next physics tick.
+
+VS2 supports several force coordinate spaces:
+
+```kotlin GameToPhysicsAdapter.kt
+// Force direction and application point both in world space
+physShip.applyWorldForce(forceInWorld, posInWorld)
+
+// Force direction relative to the ship; useful for thrusters
+physShip.applyModelForce(forceInShip, posInShip)
+
+// World-direction force applied at a ship-space position; useful for balloons
+physShip.applyWorldForceToModelPos(forceInWorld, posInShip)
+
+// Body-space force (relative to center of mass)
+physShip.applyBodyForce(forceInBody, posInBody)
+
+// Adjust the buoyancy multiplier directly
+physShip.buoyantFactor = 1.5
+```
+
+<Tip>
+For thrusters, use `applyModelForce` so the thrust direction rotates with the ship. For gravity overrides or lift, use `applyWorldForceToModelPos` so the force always points in the world-space direction you intend.
+</Tip>
+
+## GameToPhysicsAdapter (GTPA)
+
+`GameToPhysicsAdapter` is a thread-safe bridge that lets game-thread code queue forces for delivery to the physics thread. Forces enqueued via GTPA are drained and applied at the start of each physics tick.
+
+```kotlin ValkyrienSkiesMod.kt
+core.physTickEvent.on { event ->
+    dimensionalGTPAs.forEach { dimensionId, gameTickForceApplier ->
+        if (event.world.dimension == dimensionId) {
+            gameTickForceApplier.physTick(event.world, event.delta)
+        }
+    }
+    // ... block entity and entity listeners follow
+}
+```
+
+Obtain a GTPA per dimension from the mod object:
+
+```kotlin
+val gtpa: GameToPhysicsAdapter =
+    ValkyrienSkiesMod.getOrCreateGTPA(level.dimensionId)
+
+// Queue a force from the game thread — safe to call any time
+gtpa.applyWorldForce(ship.id, Vector3d(0.0, 50000.0, 0.0), null)
+```
+
+As of VS2 2.4.11, `GameToPhysicsAdapter` also exposes per-ship liquid overlap data collected during the last physics tick:
+
+```kotlin
+val overlap: Double? = gtpa.getLiquidOverlap(ship.id) // 0.0–1.0
+```
+
+## Rendering and interpolation
+
+Because physics ticks are decoupled from game ticks, the rendered position of a ship is interpolated using Minecraft's `partialTicks` value. VS2 handles this automatically for rendered ship chunks. If you write custom rendering code that depends on ship position, use `partialTicks` to interpolate between the previous and current `ShipTransform`.

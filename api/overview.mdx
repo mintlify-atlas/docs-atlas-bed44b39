@@ -1,0 +1,73 @@
+---
+title: 'API overview'
+description: 'The public API for integrating other mods with Valkyrien Skies 2.'
+---
+
+Valkyrien Skies 2 exposes a stable public API that other mods can use to query ships, react to physics events, and register custom block state data. The API is versioned independently of the mod itself — methods annotated with `@Experimental` may change, while everything else is considered stable.
+
+## Entry point
+
+The entire API is accessible through a single singleton, `vsApi`, of type `VsApi`.
+
+<Tabs>
+  <Tab title="Kotlin">
+    ```kotlin
+    import org.valkyrienskies.mod.api.vsApi
+
+    val shipWorld = vsApi.getShipWorld(level)
+    ```
+
+    The extension properties on `Level`, `MinecraftServer`, and `Minecraft` are the most convenient way to access the API from Kotlin:
+
+    ```kotlin
+    import org.valkyrienskies.mod.api.shipWorld
+
+    val shipWorld = level.shipWorld
+    val serverShipWorld = server.shipWorld
+    val clientShipWorld = minecraft.shipWorld
+    ```
+  </Tab>
+  <Tab title="Java">
+    ```java
+    import org.valkyrienskies.mod.api.ValkyrienSkies;
+
+    ShipWorld shipWorld = ValkyrienSkies.api().getShipWorld(level);
+    ```
+
+    The file is annotated `@file:JvmName("ValkyrienSkies")`, so the Kotlin top-level property `vsApi` is callable from Java as a static method: `ValkyrienSkies.api()`.
+  </Tab>
+</Tabs>
+
+<Warning>
+  If Valkyrien Skies 2 is not installed, accessing `vsApi` will throw an `IllegalStateException`. Always declare VS2 as a required or optional dependency in your mod manifest, and guard API calls behind an availability check when using it as optional.
+</Warning>
+
+## Packages
+
+| Package | Purpose |
+|---|---|
+| `org.valkyrienskies.mod.api` | Core API interfaces, the `vsApi` singleton, and Kotlin extension functions |
+| `org.valkyrienskies.mod.api.events` | Ship render events (`PreRenderShipEvent`, `PostRenderShipEvent`) and `RegisterBlockStateEvent` |
+| `org.valkyrienskies.mod.api.datagen` | Minecraft data generators for VS2-specific data |
+| `org.valkyrienskies.mod.api.config` | Config model building (primarily for Forge) |
+
+## Stability annotations
+
+VS2 uses JetBrains API status annotations to communicate stability.
+
+- **`@Experimental`** — The annotated API may change or be removed in a future release. Avoid relying on it in production integrations.
+- **`@NonExtendable`** — The annotated interface must not be implemented by third-party code. VS2 provides the only implementation.
+
+## Key pages
+
+<CardGroup cols={3}>
+  <Card title="VsApi" icon="code" href="/api/vs-api">
+    Full reference for every method and property on the `VsApi` interface, plus the Kotlin extension functions.
+  </Card>
+  <Card title="ShipWorld" icon="globe" href="/api/ship-world">
+    How to obtain and use `ShipWorld`, `ServerShipWorld`, and `ClientShipWorld` to query and manage ships in a dimension.
+  </Card>
+  <Card title="Ship" icon="ship" href="/api/ships/ship">
+    Properties and methods available on a `Ship` object, including its transform, AABB, and attached data.
+  </Card>
+</CardGroup>

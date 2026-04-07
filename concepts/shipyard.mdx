@@ -1,0 +1,93 @@
+---
+title: 'The Shipyard'
+description: 'How VS2 stores ship blocks in a dedicated coordinate region called the shipyard, and how to detect and query shipyard chunks.'
+keywords: ['shipyard', 'ship space', 'chunk claim', 'VS2ChunkAllocator', 'isChunkInShipyard', 'dimensionId']
+---
+
+The **shipyard** is a reserved region of block coordinates within a normal Minecraft dimension. When a ship is assembled, its blocks are physically moved to shipyard chunks so that VS2 can manage their physics independently from the rest of the world.
+
+## Ship chunks are real Minecraft chunks
+
+There is no separate "ship dimension." Shipyard chunks exist alongside regular world chunks in the same `ServerLevel`. A ship's blocks sit at their ship-space coordinates inside those chunks, and Minecraft's normal block, lighting, and redstone systems continue to work on them.
+
+The distinction between a shipyard chunk and a regular chunk is purely positional: shipyard chunk coordinates fall in a range that VS2 reserves via the chunk allocator and that the game would never generate naturally.
+
+## Detecting shipyard blocks and chunks
+
+Use the extension functions from `ValkyrienSkies.kt` to test whether a position belongs to the shipyard:
+
+```kotlin
+// Test a chunk by its chunk coordinates
+val inShipyard: Boolean = level.isChunkInShipyard(chunkX, chunkZ)
+
+// Test a block by its BlockPos
+val inShipyard: Boolean = level.isBlockInShipyard(blockPos)
+
+// Test a block by its individual coordinates
+val inShipyard: Boolean = level.isBlockInShipyard(x, y, z)
+```
+
+Both helpers delegate to `VsApi.isChunkInShipyard(level, chunkX, chunkZ)`. Passing `null` for `level` always returns `false`.
+
+```kotlin ValkyrienSkies.kt
+fun Level?.isBlockInShipyard(pos: BlockPos): Boolean =
+    isBlockInShipyard(pos.x, pos.y, pos.z)
+
+fun Level?.isChunkInShipyard(chunkX: Int, chunkZ: Int): Boolean =
+    vsApi.isChunkInShipyard(this, chunkX, chunkZ)
+```
+
+<Note>
+Regular world-space coordinates (where the rendered ship appears to players) are **not** in the shipyard. The shipyard contains the underlying block data. Use `getShipManagingBlock` to go from a ship-space block position to the owning ship.
+</Note>
+
+## Chunk claims
+
+Each ship is assigned a **chunk claim** — a rectangular set of shipyard chunk positions that belong exclusively to that ship. The claim is allocated when the ship is created and persists for the ship's lifetime.
+
+```kotlin ShipAssembler.kt
+// VS2 creates the ship and allocates its chunk claim internally:
+val toShip = level.shipObjectWorld.createNewShipAtBlock(
+    Vector3i(worldOldCenter, RoundingMode.FLOOR),
+    false,
+    scale * oldScale,
+    level.dimensionId
+)
+
+// The center block of the claim in ship space:
+val centerBlock: Vector3i =
+    toShip.chunkClaim.getCenterBlockCoordinates(level.yRange, Vector3i())
+```
+
+The chunk claim lets you look up a ship by any block or chunk position that falls within it:
+
+```kotlin
+val ship: Ship? = level.getShipManagingChunk(chunkX, chunkZ)
+val ship: Ship? = level.getShipManagingBlock(blockPos)
+```
+
+## Dimension IDs
+
+VS2 identifies which dimension a ship belongs to using a `DimensionId` — a string representation of the level's resource key. Obtain it with:
+
+```kotlin
+// Extension property on Level
+val dimId: DimensionId = level.dimensionId
+
+// Or via the API
+val dimId: DimensionId = vsApi.getDimensionId(level)
+```
+
+`DimensionId` is used internally when indexing ships by dimension (for example, when routing physics ticks to the correct `GameToPhysicsAdapter`):
+
+```kotlin ValkyrienSkiesMod.kt
+private val dimensionalGTPAs: HashMap<DimensionId, GameToPhysicsAdapter> = HashMap()
+
+fun getOrCreateGTPA(dimensionId: DimensionId): GameToPhysicsAdapter {
+    return dimensionalGTPAs.getOrPut(dimensionId) { GameToPhysicsAdapter() }
+}
+```
+
+<Tip>
+When writing code that stores ship-related data per-dimension (such as per-dimension force appliers or block-entity listeners), always key your maps by `DimensionId` rather than by the `Level` reference. `Level` instances can be replaced on world reload, while `DimensionId` strings remain stable.
+</Tip>

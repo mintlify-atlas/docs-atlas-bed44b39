@@ -1,97 +1,53 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Valkyrien Skies"
+description: "The physics mod to end all other physics mods. Build ships, aircraft, and moving structures in Minecraft with realistic physics, buoyancy, and collision."
 ---
 
-## Setting up
+Valkyrien Skies 2 is a Minecraft mod framework that adds a real physics simulation engine to the game. Players and mod developers alike can create ships, submarines, aircraft, and any other moving structure — complete with physics-based movement, buoyancy, collisions, and interactions with the world.
 
-Get your documentation site up and running in minutes.
+Whether you're a player looking to download and use VS2, or a mod developer integrating the API into your own mod, this documentation has you covered.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Download and install Valkyrien Skies for Fabric, Quilt, or Forge.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Add VS2 as a dependency and make your first ship in minutes.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Core Concepts" icon="book" href="/concepts/ships">
+    Understand ships, the shipyard, physics, and buoyancy.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore the full public API surface for mod developers.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## For mod developers
 
-Everything you need to create world-class documentation.
+Valkyrien Skies exposes a rich API that lets other mods create and manipulate physics ships, react to assembly events, register custom block physics states, and apply forces during physics ticks.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Mod integration setup" icon="puzzle-piece" href="/integration/setup">
+    Add VS2 as a Gradle dependency and access the API.
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Ship assembly" icon="ship" href="/integration/assembly">
+    Assemble blocks from the world into a physics ship at runtime.
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Block physics registration" icon="cube" href="/integration/block-physics">
+    Register custom solid and liquid physics states for your blocks.
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="Data generation" icon="database" href="/integration/datagen">
+    Generate block mass, friction, and elasticity data via datagen.
   </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## Commands and compatibility
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<CardGroup cols={2}>
+  <Card title="Commands reference" icon="terminal" href="/commands/overview">
+    All `/vs` commands for managing ships in-game.
+  </Card>
+  <Card title="Mod compatibility" icon="link" href="/compat/create">
+    Ships work with Create, ComputerCraft, Dynmap, Hex Casting, and more.
+  </Card>
+</CardGroup>

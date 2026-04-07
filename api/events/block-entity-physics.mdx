@@ -1,0 +1,187 @@
+---
+title: 'BlockEntityPhysicsListener'
+description: 'Receive a callback every physics tick for a block entity or entity on a ship.'
+---
+
+`BlockEntityPhysicsListener` is an interface in `org.valkyrienskies.mod.api` that block entities implement to participate in the physics simulation. It is annotated `@PhysTickOnly`, meaning its methods are called exclusively on the physics thread.
+
+## Interface: `BlockEntityPhysicsListener`
+
+**Package:** `org.valkyrienskies.mod.api`
+
+```kotlin
+@PhysTickOnly
+interface BlockEntityPhysicsListener {
+    fun physTick(physShip: PhysShip?, physLevel: PhysLevel)
+    var dimension: DimensionId
+}
+```
+
+### `physTick`
+
+Called every physics tick for as long as the block entity is registered.
+
+<ParamField path="physShip" type="PhysShip?">
+  The ship in the physics pipeline that this block is currently on. `null` if the block is not on a ship.
+</ParamField>
+
+<ParamField path="physLevel" type="PhysLevel">
+  The physics world at this tick. Contains the current state of the physics simulation — ships, constraints, and more.
+</ParamField>
+
+### `dimension`
+
+<ParamField path="dimension" type="DimensionId">
+  The dimension this block entity belongs to. Set this before registering the listener. It is used to route physics tick events to the correct dimension.
+</ParamField>
+
+<Warning>
+  `physTick` is called on the **physics thread**. Do not access regular block entity fields or any non-thread-safe state from inside this method. Use `AtomicReference`, `AtomicBoolean`, `ConcurrentLinkedQueue`, or other concurrency primitives to safely share data between the game tick and the physics tick.
+</Warning>
+
+## Registration
+
+Implement the interface on your `BlockEntity` subclass, then register and deregister it at the appropriate lifecycle points.
+
+<Steps>
+  <Step title="Implement BlockEntityPhysicsListener">
+    Add the interface to your block entity class and provide `physTick` and `dimension`.
+  </Step>
+  <Step title="Register on load">
+    Call `ValkyrienSkiesMod.addBlockEntityPhysTicker` inside `onLoad` or `setLevel`.
+  </Step>
+  <Step title="Deregister on removal">
+    Call `ValkyrienSkiesMod.removeBlockEntityPhysTicker` inside `setRemoved` to stop receiving ticks and avoid memory leaks.
+  </Step>
+</Steps>
+
+### Registration methods
+
+```kotlin
+// Register
+ValkyrienSkiesMod.addBlockEntityPhysTicker(dimensionId: DimensionId, pos: BlockPos, blockEntity: BlockEntityPhysicsListener)
+
+// Deregister
+ValkyrienSkiesMod.removeBlockEntityPhysTicker(pos: BlockPos, dimensionId: DimensionId)
+```
+
+`addBlockEntityPhysTicker` automatically resolves the ship the block is on at the time of registration and stores the association. If the level is client-side, the call is silently ignored.
+
+## Complete example
+
+The example below shows a block entity that reads a target force from the game thread and applies it on the physics thread using an `AtomicReference`.
+
+```kotlin
+import net.minecraft.core.BlockPos
+import net.minecraft.world.level.block.entity.BlockEntity
+import net.minecraft.world.level.block.entity.BlockEntityType
+import org.joml.Vector3d
+import org.valkyrienskies.core.api.ships.PhysShip
+import org.valkyrienskies.core.api.world.PhysLevel
+import org.valkyrienskies.core.api.world.properties.DimensionId
+import org.valkyrienskies.mod.api.BlockEntityPhysicsListener
+import org.valkyrienskies.mod.api.vsApi
+import org.valkyrienskies.mod.common.ValkyrienSkiesMod
+import java.util.concurrent.atomic.AtomicReference
+
+class ThrusterBlockEntity(pos: BlockPos, state: net.minecraft.world.level.block.state.BlockState) :
+    BlockEntity(TYPE, pos, state), BlockEntityPhysicsListener {
+
+    // Thread-safe channel from game tick → physics tick
+    private val pendingForce = AtomicReference(Vector3d(0.0, 0.0, 0.0))
+
+    override var dimension: DimensionId = ""
+
+    override fun onLoad() {
+        super.onLoad()
+        val level = level ?: return
+        dimension = vsApi.getDimensionId(level)
+        ValkyrienSkiesMod.addBlockEntityPhysTicker(dimension, blockPos, this)
+    }
+
+    override fun setRemoved() {
+        super.setRemoved()
+        ValkyrienSkiesMod.removeBlockEntityPhysTicker(blockPos, dimension)
+    }
+
+    // Called from the game tick — safe to access block entity state here
+    fun setThrustVector(x: Double, y: Double, z: Double) {
+        pendingForce.set(Vector3d(x, y, z))
+    }
+
+    // Called on the physics thread — only access thread-safe state here
+    override fun physTick(physShip: PhysShip?, physLevel: PhysLevel) {
+        val ship = physShip ?: return
+        val force = pendingForce.get()
+        ship.applyInvariantForce(force)
+    }
+
+    companion object {
+        lateinit var TYPE: BlockEntityType<ThrusterBlockEntity>
+    }
+}
+```
+
+## `EntityPhysicsListener`
+
+Entities use a companion interface, `EntityPhysicsListener`, in the same package. The only difference is that `physTick` does not receive a `PhysShip` — entities are not directly managed by a ship in the physics pipeline.
+
+**Package:** `org.valkyrienskies.mod.api`
+
+```kotlin
+interface EntityPhysicsListener {
+    fun physTick(physLevel: PhysLevel)
+    var dimension: DimensionId
+}
+```
+
+### `physTick`
+
+<ParamField path="physLevel" type="PhysLevel">
+  The physics world at this tick. Contains the current state of the simulation — ships, constraints, and more.
+</ParamField>
+
+### Registration
+
+```kotlin
+// Register
+ValkyrienSkiesMod.addEntityPhysTicker(dimensionId: DimensionId, entity: Entity)
+
+// Deregister
+ValkyrienSkiesMod.removeEntityPhysTicker(entity: Entity, dimensionId: DimensionId)
+```
+
+<Warning>
+  The same threading rules apply to `EntityPhysicsListener`. Do not read or write non-thread-safe entity fields from `physTick`.
+</Warning>
+
+### Entity example
+
+```kotlin
+import net.minecraft.world.entity.Entity
+import org.valkyrienskies.core.api.world.PhysLevel
+import org.valkyrienskies.core.api.world.properties.DimensionId
+import org.valkyrienskies.mod.api.EntityPhysicsListener
+import org.valkyrienskies.mod.api.vsApi
+import org.valkyrienskies.mod.common.ValkyrienSkiesMod
+
+class MyPhysicsEntity : Entity(/* ... */), EntityPhysicsListener {
+
+    override var dimension: DimensionId = ""
+
+    override fun addedToLevel(level: net.minecraft.world.level.Level) {
+        super.addedToLevel(level)
+        dimension = vsApi.getDimensionId(level)
+        ValkyrienSkiesMod.addEntityPhysTicker(dimension, this)
+    }
+
+    override fun removedFromLevel(level: net.minecraft.world.level.Level) {
+        super.removedFromLevel(level)
+        ValkyrienSkiesMod.removeEntityPhysTicker(this, dimension)
+    }
+
+    override fun physTick(physLevel: PhysLevel) {
+        // Physics thread only — use thread-safe data access
+    }
+}
+```

@@ -1,0 +1,133 @@
+---
+title: 'ClientShip'
+description: 'Client-side ship view used for rendering and coordinate transforms.'
+---
+
+`ClientShip` extends [`Ship`](/api/ships/ship) with client-side rendering information. It is defined in vs-core at `org.valkyrienskies.core.api.ships.ClientShip` and is only available in client-side code.
+
+```
+Ship
+└── ClientShip
+```
+
+`ClientShip` is a render-only view of a ship. It carries no physics authority — all physics simulation runs server-side. Use `ClientShip` when you need to:
+
+- Transform coordinates for rendering
+- Read the ship's position or rotation during a render frame
+- Override the renderer for a specific ship
+- Hook into pre/post ship render events
+
+<Warning>
+  Never modify physics state from a `ClientShip`. Physics properties such as `velocity` and `transform` are the last values received from the server and may lag one or more ticks behind.
+</Warning>
+
+## Render transform
+
+On the client, `ClientShip` exposes a `renderTransform` that is interpolated between the previous and current tick transforms for smooth rendering. Use `renderTransform` instead of `transform` when positioning objects in a render frame.
+
+```kotlin
+// Convert a ship-space position to world space for rendering
+val worldMatrix = clientShip.renderTransform.shipToWorld
+val worldPos = worldMatrix.transformPosition(shipSpaceVec, Vector3d())
+```
+
+<Note>
+  `renderTransform` is a client-only property on `ClientShip`. The `transform` property (inherited from `Ship`) contains the last game-tick value and is safe for logic but not for smooth rendering.
+</Note>
+
+## ClientShipSettings
+
+Per-ship client settings are exposed via the `settings` extension property defined in `ShipSettings.kt`:
+
+```kotlin
+val ClientShip.settings: ClientShipSettings
+```
+
+<ParamField path="settings.renderer" type="ShipRenderer?">
+  Override the renderer used for this specific ship. When `null`, the ship uses the default renderer from `VSGameConfig.CLIENT.defaultRenderer`.
+</ParamField>
+
+```kotlin
+// Read the effective renderer for this ship (resolves the default if not overridden)
+val renderer: ShipRenderer = clientShip.shipRenderer
+```
+
+## ShipRenderer
+
+`ShipRenderer` is an enum defined in `org.valkyrienskies.mod.common.config.ShipRenderer`:
+
+| Value      | Description                                  |
+| ---------- | -------------------------------------------- |
+| `VANILLA`  | Default Minecraft chunk renderer.            |
+| `FLYWHEEL` | Flywheel instanced renderer (if available).  |
+
+The global default is controlled by `VSGameConfig.CLIENT.defaultRenderer` (default: `VANILLA`).
+
+## Getting a ClientShip
+
+### From the client level and ship ID
+
+```kotlin
+import org.valkyrienskies.mod.api.getShipById
+
+val ship: Ship? = clientLevel.getShipById(shipId)
+val clientShip: ClientShip? = ship as? ClientShip
+```
+
+### From a block position
+
+```kotlin
+import org.valkyrienskies.mod.common.getLoadedShipManagingPos
+
+// Returns ClientShip? (null if not loaded or not in a ship)
+val clientShip: ClientShip? = clientLevel.getLoadedShipManagingPos(blockPos)
+```
+
+### Iterating all loaded client ships
+
+```kotlin
+import org.valkyrienskies.mod.api.shipWorld
+import net.minecraft.client.Minecraft
+
+val minecraft = Minecraft.getInstance()
+for (ship in minecraft.shipWorld?.allShips ?: emptyList()) {
+    // ship is ClientShip
+}
+```
+
+## Render events
+
+VS2 exposes two experimental events for hooking into the ship render pipeline. Subscribe via `vsApi`:
+
+```kotlin
+import org.valkyrienskies.mod.api.vsApi
+
+// Called just before a ship is rendered
+vsApi.preRenderShipEvent.on { event ->
+    // PreRenderShipEvent (experimental — signature may change)
+}
+
+// Called just after a ship is rendered
+vsApi.postRenderShipEvent.on { event ->
+    // PostRenderShipEvent (experimental — signature may change)
+}
+```
+
+<Warning>
+  `PreRenderShipEvent` and `PostRenderShipEvent` are both annotated `@Experimental`. Their signatures and the guarantees around when they fire may change in future VS2 releases.
+</Warning>
+
+## Coordinate transforms for rendering
+
+Use the client-side extension functions in `VSGameUtils.kt` to transform coordinates during rendering:
+
+```kotlin
+import org.valkyrienskies.mod.common.toShipRenderCoordinates
+import org.valkyrienskies.mod.common.transformRenderAABBToWorld
+
+// Transform a world-space position into the ship's render space (for widget overlays, etc.)
+val renderSpacePos: Vec3 = clientLevel.toShipRenderCoordinates(shipSpaceOrigin, worldPos)
+
+// Transform a bounding box at a block position into world space using the render transform
+val worldAABB: AABB = clientLevel.transformRenderAABBToWorld(blockPos, localAABB)
+```

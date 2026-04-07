@@ -1,0 +1,144 @@
+---
+title: 'Ships'
+description: 'What ships are, how they are represented in the world, and how to work with them from code.'
+keywords: ['ship', 'ShipId', 'ShipTransform', 'ServerShip', 'ClientShip', 'ship space', 'world space']
+---
+
+A **ship** is a collection of Minecraft blocks that has been lifted out of the world and turned into a physics entity. Once assembled, those blocks live in the shipyard — a special coordinate region — while the ship itself moves and rotates freely in the world.
+
+## Ship data
+
+Every ship carries a fixed set of properties regardless of whether it is loaded on the server or the client.
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | `ShipId` (`Long`) | Globally unique identifier for the ship. Stable across saves. |
+| `transform` | `ShipTransform` | Position, rotation, and scale. Contains the `shipToWorld` and `worldToShip` matrices. |
+| `inertiaData` | `ShipInertiaData` | Mass, center of mass, and moment of inertia tensor. |
+| `velocity` | `Vector3dc` | Linear velocity in world space (meters per physics tick). |
+| `angularVelocity` | `Vector3dc` | Angular velocity in world space (radians per physics tick). |
+| `chunkClaim` | `ShipChunkClaim` | The set of shipyard chunks allocated to this ship. |
+
+## Server ships vs client ships
+
+VS2 exposes two representations of a ship depending on where your code runs.
+
+<CardGroup cols={2}>
+  <Card title="ServerShip" icon="server">
+    Full physics data. Writable. Used for applying forces, modifying attachments, and assembly. Only accessible server-side.
+  </Card>
+  <Card title="ClientShip" icon="monitor">
+    Read-only render view. Used for coordinate transforms and displaying the ship. Only accessible client-side.
+  </Card>
+</CardGroup>
+
+Both types implement the common `Ship` interface, so lookup functions like `getShipManagingBlock` return `Ship` and you can cast to the specific subtype when needed.
+
+## Ship attachments
+
+Attachments are arbitrary data objects serialized alongside a ship. They persist across saves and can be read from both the game thread and (with care) the physics thread.
+
+Attachments are registered during mod initialization:
+
+```kotlin ValkyrienSkiesMod.kt
+core.registerAttachment(ShipSettings::class.java)
+core.registerAttachment(BuoyancyHandlerAttachment::class.java)
+```
+
+And populated on ship load:
+
+```kotlin ValkyrienSkiesMod.kt
+core.shipLoadEvent.on { event ->
+    event.ship.setAttachment(BuoyancyHandlerAttachment())
+}
+```
+
+### ShipSettings
+
+`ShipSettings` is the built-in attachment for per-ship configuration flags.
+
+```kotlin ShipSettings.kt
+data class ShipSettings(
+    /**
+     * If true, the ship's chunks will attempt terrain generation.
+     * You almost never want this.
+     */
+    var shouldGenerateChunks: Boolean = false,
+
+    /**
+     * If true, this ship will change dimensions when it passes through a portal.
+     */
+    var changeDimensionOnTouchPortals: Boolean = true
+)
+```
+
+Access settings on a `LoadedServerShip` using the extension property:
+
+```kotlin
+val ship: LoadedServerShip = ...
+val settings = ship.settings          // creates default if absent
+settings.changeDimensionOnTouchPortals = false
+```
+
+## Coordinate spaces
+
+Ship blocks exist at fixed **ship space** coordinates in the shipyard. The `ShipTransform` maps those coordinates into **world space** at runtime.
+
+| Transform | Direction | Matrix field |
+|---|---|---|
+| `shipToWorld` | Ship space → world space | `ship.transform.shipToWorld` |
+| `worldToShip` | World space → ship space | `ship.transform.worldToShip` |
+
+Use the extension functions in `ValkyrienSkies.kt` to convert positions:
+
+```kotlin
+// Ship space position → world space
+val worldPos: Vec3 = ship.positionToWorld(shipSpacePos)
+
+// World space position → ship space
+val shipPos: Vec3 = ship.positionToShip(worldSpacePos)
+```
+
+<Note>
+Both matrices are `Matrix4dc` values from JOML. They encode position, rotation, and scale together. Use `transformPosition` to move a point and `transformDirection` to rotate a direction vector without applying translation.
+</Note>
+
+## Looking up ships
+
+The primary entry points are extension functions on `Level?` defined in `ValkyrienSkies.kt`.
+
+```kotlin
+// Get the ship whose shipyard chunk contains this block position
+val ship: Ship? = level.getShipManagingBlock(blockPos)
+
+// Get the ship whose shipyard chunk contains this chunk position
+val ship: Ship? = level.getShipManagingChunk(chunkX, chunkZ)
+
+// Get a ship directly by its ShipId
+val ship: Ship? = level.getShipById(shipId)
+
+// Get all ships whose AABBs intersect a given world-space AABB
+val ships: Iterable<Ship> = level.getShipsIntersecting(aabb)
+```
+
+<Tip>
+`getShipManagingBlock` works on **shipyard** block coordinates (the block's position in the shipyard, not the rendered position in the world). If you have a block entity inside a ship, `blockEntity.blockPos` is already in shipyard/ship space.
+</Tip>
+
+### Full example
+
+The following example logs the ship's world position every time a block entity tick runs:
+
+```kotlin
+import org.valkyrienskies.mod.api.getShipManagingBlock
+import org.valkyrienskies.mod.api.positionToWorld
+
+class MyBlockEntity(pos: BlockPos, state: BlockState) : BlockEntity(MY_TYPE, pos, state) {
+
+    fun tick() {
+        val ship = level?.getShipManagingBlock(blockPos) ?: return
+        val worldPos = ship.positionToWorld(blockPos.center)
+        println("Ship ${ship.id} is at world position $worldPos")
+    }
+}
+```

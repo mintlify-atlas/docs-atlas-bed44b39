@@ -1,0 +1,47 @@
+---
+title: "ComputerCraft Compatibility"
+description: "Integrating Valkyrien Skies 2 with CC: Tweaked and Ducky Peripherals."
+---
+
+Valkyrien Skies 2 supports [CC: Tweaked](https://modrinth.com/mod/cc-tweaked) (version 1.115.1). VS2 ships are recognized as entities, allowing ComputerCraft peripherals to detect and interact with them.
+
+## Ducky Peripherals
+
+The [Ducky Peripherals](https://github.com/samsartor/ducky_periph) mod adds ComputerCraft peripherals that expose VS2 ship data to Lua programs. VS2 ships are registered as entities in the `ducky_periph` entity data, so Ducky peripherals can detect nearby ships.
+
+Example: reading ship velocity from a Lua script attached to a Ducky peripheral on a ship:
+
+```lua
+local p = peripheral.find("ship_controller")
+if p then
+  local vx, vy, vz = p.getVelocity()
+  print("Ship velocity: " .. vx .. ", " .. vy .. ", " .. vz)
+end
+```
+
+<Note>
+  Exact peripheral method names depend on the version of Ducky Peripherals installed. Refer to that mod's documentation for the full API.
+</Note>
+
+## Turtle movement on scaled ships
+
+When ships are scaled up or down using `/vs scale`, turtles attempting to leave the ship may behave unexpectedly due to coordinate space differences. VS2 provides a server config option to prevent this:
+
+```toml
+[ComputerCraft]
+# Prevent turtles from leaving scaled ships (default: false)
+canTurtlesLeaveScaledShips = false
+```
+
+Setting this to `false` (the default) blocks turtles from pathfinding off a scaled ship, avoiding glitches. Set to `true` only if you need turtle automation that moves between ship and world on scaled ships and have accounted for the coordinate scaling.
+
+## Tips for ship automation
+
+<CardGroup cols={2}>
+  <Card title="Mount computers on ships" icon="microchip">
+    Computers and turtles placed on a ship move with it. Wire them to thrusters or other block entities implementing `BlockEntityPhysicsListener` for physics-aware automation.
+  </Card>
+  <Card title="Detect ships with sensors" icon="radar">
+    Entity sensor peripherals can scan for nearby VS2 ship entities, returning their IDs and transforms for use in navigation scripts.
+  </Card>
+</CardGroup>

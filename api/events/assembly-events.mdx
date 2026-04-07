@@ -1,0 +1,285 @@
+---
+title: 'Assembly events'
+description: 'Hook into the ship assembly lifecycle using VSAssemblyEvents.'
+---
+
+`VSAssemblyEvents` is a static object in `org.valkyrienskies.mod.common.assembly` that fires events at each stage of ship assembly. Listeners receive a shared `tempData` map that persists across all three events, allowing you to pass computed data forward through the assembly pipeline.
+
+## Events
+
+### `beforeCopy`
+
+Fired before any blocks are copied from the source structure to the new ship. Use this event to inspect the source region, record data into `tempData`, and prepare for the paste phase.
+
+```kotlin
+VSAssemblyEvents.beforeCopy.on { event: VSAssemblyEvents.BeforeCopy ->
+    // Inspect the source and store data for later events
+    event.tempData["myMod:metadata"] = CompoundTag().apply {
+        putInt("blockCount", event.blockPositions.size)
+    }
+}
+```
+
+**Data class:** `VSAssemblyEvents.BeforeCopy`
+
+<ParamField path="level" type="ServerLevel">
+  The server level where the assembly is taking place.
+</ParamField>
+
+<ParamField path="minPos" type="Vector3dc">
+  The minimum corner of the bounding box enclosing the blocks being assembled.
+</ParamField>
+
+<ParamField path="maxPos" type="Vector3dc">
+  The maximum corner of the bounding box enclosing the blocks being assembled.
+</ParamField>
+
+<ParamField path="center" type="Vector3dc">
+  The center of the structure being assembled.
+</ParamField>
+
+<ParamField path="shipAssembledFrom" type="ServerShip?">
+  The existing ship the blocks are being taken from, or `null` if assembling from the ground.
+</ParamField>
+
+<ParamField path="blockPositions" type="Set<BlockPos>">
+  The set of block positions included in this assembly operation.
+</ParamField>
+
+<ParamField path="tempData" type="MutableMap<String, CompoundTag>">
+  A mutable map for storing data to pass to subsequent events. Use namespaced keys (e.g., `"myMod:key"`) to avoid collisions with other mods.
+</ParamField>
+
+---
+
+### `onPasteBeforeBlocksAreLoaded`
+
+Fired after each individual ship is created but before its blocks are placed and block entities are loaded. Use this event to initialize ship attachments or data that must exist before blocks tick.
+
+```kotlin
+VSAssemblyEvents.onPasteBeforeBlocksAreLoaded.on { event: VSAssemblyEvents.OnPasteBeforeBlocksAreLoaded ->
+    val metadata = event.tempData["myMod:metadata"] ?: return@on
+    // Initialize data on the new ship before blocks are placed
+}
+```
+
+**Data class:** `VSAssemblyEvents.OnPasteBeforeBlocksAreLoaded`
+
+<ParamField path="level" type="ServerLevel">
+  The server level where the new ship was created.
+</ParamField>
+
+<ParamField path="oldShip" type="ServerShip?">
+  The source ship before assembly, or `null` if assembling from the ground.
+</ParamField>
+
+<ParamField path="newShip" type="ServerShip?">
+  The newly created ship, or `null` if assembling to the ground.
+</ParamField>
+
+<ParamField path="centerPosition" type="Pair<Vector3dc, Vector3dc>">
+  A pair of `(previousCenter, newCenter)` — the center of the source structure and the center of the newly placed ship.
+</ParamField>
+
+<ParamField path="tempData" type="Map<String, CompoundTag>">
+  The data map populated during `beforeCopy`. Read-only in this event.
+</ParamField>
+
+---
+
+### `onPasteAfterBlocksAreLoaded`
+
+Fired after all ships have their blocks placed, block entities loaded, and chunks ticking. This is the right place to initialize gameplay logic that depends on block entities being present.
+
+```kotlin
+VSAssemblyEvents.onPasteAfterBlocksAreLoaded.on { event: VSAssemblyEvents.OnPasteAfterBlocksAreLoaded ->
+    val newShip = event.newShip ?: return@on
+    val metadata = event.tempData["myMod:metadata"] ?: return@on
+    // Safe to interact with block entities on newShip here
+}
+```
+
+**Data class:** `VSAssemblyEvents.OnPasteAfterBlocksAreLoaded`
+
+<ParamField path="level" type="ServerLevel">
+  The server level where the ship was assembled.
+</ParamField>
+
+<ParamField path="oldShip" type="ServerShip?">
+  The source ship before assembly, or `null` if assembled from the ground.
+</ParamField>
+
+<ParamField path="newShip" type="ServerShip?">
+  The fully assembled ship with all blocks loaded, or `null` if assembled to the ground.
+</ParamField>
+
+<ParamField path="centerPosition" type="Pair<Vector3dc, Vector3dc>">
+  A pair of `(previousCenter, newCenter)`.
+</ParamField>
+
+<ParamField path="tempData" type="Map<String, CompoundTag>">
+  The data map populated during `beforeCopy`. Read-only in this event.
+</ParamField>
+
+---
+
+## The `tempData` map
+
+`tempData` is a `MutableMap<String, CompoundTag>` that VS2 passes through the entire assembly sequence. It lets you record data in `beforeCopy` and read it back in the paste events without storing any module-level state.
+
+- Write to it in `beforeCopy` (mutable).
+- Read from it in `onPasteBeforeBlocksAreLoaded` and `onPasteAfterBlocksAreLoaded` (read-only).
+- Always use **namespaced keys** such as `"myMod:shipConfig"` to avoid collisions with other mods.
+
+---
+
+## Block-level hooks: `ICopyableBlock`
+
+If your block needs to transform its own NBT data during assembly (for example, to remap block positions or ship IDs), implement `ICopyableBlock` on the **block class** (not the block entity).
+
+<Note>
+  `ICopyableBlock` is annotated `@Experimental` and may change in future releases.
+</Note>
+
+**Package:** `org.valkyrienskies.mod.common.assembly`
+
+```kotlin
+@ApiStatus.Experimental
+interface ICopyableBlock {
+    fun onCopy(
+        level: ServerLevel,
+        pos: BlockPos,
+        state: BlockState,
+        be: BlockEntity?,
+        shipsBeingCopied: List<ServerShip>,
+        centerPositions: Map<Long, Vector3dc>
+    ): CompoundTag?
+
+    fun onPaste(
+        level: ServerLevel,
+        pos: BlockPos,
+        state: BlockState,
+        oldShipIdToNewId: Map<Long, Long>,
+        centerPositions: Map<Long, Pair<Vector3dc, Vector3dc>>,
+        tag: CompoundTag?
+    ): CompoundTag?
+
+    fun pasteSurvivalCost(data: Supplier<CompoundTag>?): Map<Item, Int>? = null
+}
+```
+
+<ParamField path="onCopy.level" type="ServerLevel">
+  The level the block is being copied from.
+</ParamField>
+
+<ParamField path="onCopy.pos" type="BlockPos">
+  The position of this block in the source level.
+</ParamField>
+
+<ParamField path="onCopy.state" type="BlockState">
+  The block state at the time of copy.
+</ParamField>
+
+<ParamField path="onCopy.be" type="BlockEntity?">
+  The block entity at this position, if one exists.
+</ParamField>
+
+<ParamField path="onCopy.shipsBeingCopied" type="List<ServerShip>">
+  All ships involved in this assembly operation.
+</ParamField>
+
+<ParamField path="onCopy.centerPositions" type="Map<Long, Vector3dc>">
+  A map of ship ID to its center position at copy time. Use `-1L` as the key when copying from the ground.
+</ParamField>
+
+`onCopy` returns an optional `CompoundTag`. If non-null, the assembly system saves it and passes it to `onPaste` as the `tag` argument. If null, the system falls back to the block entity's own NBT.
+
+<ParamField path="onPaste.oldShipIdToNewId" type="Map<Long, Long>">
+  Maps old ship IDs to the IDs of the newly created ships. Use this to remap any stored ship IDs in your block's data.
+</ParamField>
+
+<ParamField path="onPaste.centerPositions" type="Map<Long, Pair<Vector3dc, Vector3dc>>">
+  Maps old ship IDs to `(oldCenter, newCenter)` pairs. Use this to translate stored world positions into the new ship's coordinate space.
+</ParamField>
+
+<ParamField path="onPaste.tag" type="CompoundTag?">
+  The tag returned by `onCopy`, or the block entity's saved NBT if `onCopy` returned null.
+</ParamField>
+
+`onPaste` returns an optional `CompoundTag`. If non-null, the system uses it to load the block entity instead of `tag`.
+
+`pasteSurvivalCost` returns a map of items required to paste this block in survival mode. Return `null` (the default) to add no cost.
+
+---
+
+## Ship attachment hooks: `ICopyableAttachment`
+
+Ship attachments (data objects stored on a `ServerShip` via `ship.setAttachment`) can implement `ICopyableAttachment` to participate in the assembly lifecycle.
+
+<Note>
+  `ICopyableAttachment` is annotated `@Experimental` and may change in future releases.
+</Note>
+
+**Package:** `org.valkyrienskies.mod.common.assembly`
+
+```kotlin
+@ApiStatus.Experimental
+interface ICopyableAttachment {
+    fun onCopy(
+        level: Supplier<ServerLevel>,
+        shipOn: LoadedServerShip,
+        shipsToBeSaved: List<ServerShip>,
+        centerPositions: Map<ShipId, Vector3dc>
+    )
+
+    fun onAfterCopy(
+        level: Supplier<ServerLevel>,
+        shipOn: LoadedServerShip,
+        shipsToBeSaved: List<ServerShip>,
+        centerPositions: Map<ShipId, Vector3dc>
+    ) {}
+
+    fun onPaste(
+        level: Supplier<ServerLevel>,
+        shipOn: LoadedServerShip,
+        loadedShips: Map<Long, ServerShip>,
+        centerPositions: Map<ShipId, Pair<Vector3dc, Vector3dc>>
+    )
+}
+```
+
+- `onCopy` — called before the attachment is serialized (Jackson). Record any data you need to survive serialization here.
+- `onAfterCopy` — called after serialization. Has a default no-op implementation.
+- `onPaste` — called after all ships are created and all blocks are loaded. Remap stored ship IDs and positions here using `loadedShips` and `centerPositions`.
+
+---
+
+## Complete example
+
+The example below listens to `onPasteAfterBlocksAreLoaded` to run initialization logic after a ship is fully assembled.
+
+```kotlin
+import net.minecraft.nbt.CompoundTag
+import org.valkyrienskies.mod.common.assembly.VSAssemblyEvents
+
+fun registerAssemblyListeners() {
+    // Store metadata during the copy phase
+    VSAssemblyEvents.beforeCopy.on { event ->
+        val tag = CompoundTag()
+        tag.putInt("blockCount", event.blockPositions.size)
+        event.tempData["myMod:shipMeta"] = tag
+    }
+
+    // Finalize initialization once all blocks and block entities are loaded
+    VSAssemblyEvents.onPasteAfterBlocksAreLoaded.on { event ->
+        val newShip = event.newShip ?: return@on
+        val meta = event.tempData["myMod:shipMeta"] ?: return@on
+
+        val blockCount = meta.getInt("blockCount")
+        val (oldCenter, newCenter) = event.centerPosition
+
+        // Example: set a custom attachment on the assembled ship
+        newShip.setAttachment(MyShipData(blockCount, newCenter))
+    }
+}
+```

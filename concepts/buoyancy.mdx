@@ -1,0 +1,86 @@
+---
+title: 'Buoyancy'
+description: 'How VS2 calculates buoyancy for ships, the role of BuoyancyHandlerAttachment, air-pocket buoyancy, and relevant server configuration.'
+keywords: ['buoyancy', 'BuoyancyHandlerAttachment', 'buoyantFactor', 'liquidOverlap', 'enablePocketBuoyancy', 'air pocket']
+---
+
+VS2 ships receive automatic buoyancy based on how much of their volume overlaps surrounding fluid blocks. An upward force is applied proportional to the fluid displacement, following an approximation of Archimedes' principle.
+
+## BuoyancyHandlerAttachment
+
+Every ship receives a `BuoyancyHandlerAttachment` on load. This attachment implements `ShipPhysicsListener` and runs on the physics thread each tick to update the ship's buoyancy factor.
+
+```kotlin ValkyrienSkiesMod.kt
+core.shipLoadEvent.on { event ->
+    event.ship.setAttachment(BuoyancyHandlerAttachment())
+}
+```
+
+When air-pocket buoyancy is enabled, the attachment reads `pocketVolumeTotal` (updated server-side) and raises the ship's `buoyantFactor` accordingly:
+
+```kotlin BuoyancyHandlerAttachment.kt
+override fun physTick(physShip: PhysShip, physLevel: PhysLevel) {
+    if (!VSGameConfig.SERVER.enablePocketBuoyancy) return
+    if (buoyancyData.pocketCenterAverage.lengthSquared() == 0.0) return // no pockets
+
+    physShip.buoyantFactor =
+        1.0 + (buoyancyData.pocketVolumeTotal * VSGameConfig.SERVER.buoyancyFactorPerPocketVolume)
+}
+```
+
+A `buoyantFactor` of `1.0` is neutral (base water displacement only). Values above `1.0` provide additional upward force.
+
+## Liquid overlap
+
+The physics engine tracks the fraction of a ship's bounding volume that overlaps a fluid (from 0.0 to 1.0). This value is available per-ship via `GameToPhysicsAdapter`:
+
+```kotlin
+val gtpa = ValkyrienSkiesMod.getOrCreateGTPA(level.dimensionId)
+val overlap: Double? = gtpa.getLiquidOverlap(ship.id)
+```
+
+`GameToPhysicsAdapter` collects liquid overlap from all active ships at the end of each physics tick:
+
+```kotlin GameToPhysicsAdapter.kt
+shipToLiquidOverlap.clear()
+physLevel.getAllPhysShips().forEach { ship ->
+    shipToLiquidOverlap[ship.id] = ship.liquidOverlap
+}
+```
+
+## Air-pocket buoyancy
+
+With `enablePocketBuoyancy = true` (disabled by default), VS2 detects **sealed air pockets** inside a ship and adds extra upward force proportional to their total volume. This simulates the lift a hollow hull provides — the same effect that keeps real submarines and boats afloat.
+
+### Server configuration
+
+Both options live in `VSGameConfig.Server`:
+
+```kotlin VSGameConfig.kt
+@ConfigEntry(description = "If true, enables buoyancy from serverside air pockets.")
+var enablePocketBuoyancy = false
+
+@ConfigEntry(description = "Buoyancy factor added per cubic meter of air pocket inside a ship")
+var buoyancyFactorPerPocketVolume = 0.05 // per cubic meter
+```
+
+| Config key | Default | Description |
+|---|---|---|
+| `enablePocketBuoyancy` | `false` | Enables sealed-air-pocket lift. |
+| `buoyancyFactorPerPocketVolume` | `0.05` | Additional `buoyantFactor` per cubic meter of enclosed air. |
+
+<Tip>
+To get meaningful lift from air pockets, surround the interior of your ship with a fully sealed hull — no gaps. Each cubic meter of enclosed air adds 0.05 to the ship's `buoyantFactor`. A 10×10×5 sealed air space (500 m³) gives `+25.0`, enough to keep most medium-sized vessels afloat even when fully submerged.
+</Tip>
+
+## Atmospheric ceiling
+
+In VS2 2.4.11, the atmospheric ceiling (`atmosphericMax`) was raised from 1000 to 2000. This affects how buoyancy scales at high altitudes and prevents propeller-driven aircraft from stalling unexpectedly above the cloud layer.
+
+> Atmospheric max has been changed from 1000 to 2000. This should make propeller planes much more controllable at altitudes above the clouds, where before they would stall pretty suddenly.
+>
+> — VS 2.4.11 changelog
+
+<Note>
+Air-pocket detection runs server-side. Enabling it increases server load proportional to the number of ships with large sealed interiors. Start with the default `buoyancyFactorPerPocketVolume` and tune upward if your ships need more lift.
+</Note>

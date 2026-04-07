@@ -1,0 +1,166 @@
+---
+title: 'Ship'
+description: 'Base interface for all physics ships in Valkyrien Skies 2.'
+---
+
+`Ship` is the base interface for every physics ship in VS2. It is defined in vs-core at `org.valkyrienskies.core.api.ships.Ship` and is available on both the server and client. All more specific ship types — [`ServerShip`](/api/ships/server-ship), [`LoadedServerShip`](/api/ships/server-ship#loadedserverShip), and [`ClientShip`](/api/ships/client-ship) — extend this interface.
+
+## Properties
+
+<ParamField path="id" type="Long">
+  Globally unique identifier for the ship (`typealias ShipId = Long`). Stable across save/load.
+</ParamField>
+
+<ParamField path="slug" type="String?">
+  Human-readable name for the ship. Corresponds to the name assigned via `/vs rename`. Returns `null` if no name has been set.
+</ParamField>
+
+<ParamField path="transform" type="ShipTransform">
+  The current spatial transform of the ship. Contains all coordinate-space information needed to map between ship space and world space.
+
+  <ParamField path="transform.shipToWorld" type="Matrix4dc">
+    4×4 double-precision matrix transforming positions from ship space into world space.
+  </ParamField>
+
+  <ParamField path="transform.worldToShip" type="Matrix4dc">
+    Inverse of `shipToWorld`. Transforms world-space positions into ship space.
+  </ParamField>
+
+  <ParamField path="transform.shipToWorldRotation" type="Quaterniondc">
+    The rotational component of the ship-to-world transform as a quaternion.
+  </ParamField>
+
+  <ParamField path="transform.positionInWorld" type="Vector3dc">
+    The ship origin's position in world space (corresponds to the ship's center of mass in world coordinates).
+  </ParamField>
+
+  <ParamField path="transform.scaling" type="Vector3dc">
+    Per-axis scale of the ship. Uniform scaling ships have the same value on all three axes.
+  </ParamField>
+</ParamField>
+
+<ParamField path="shipAABB" type="AABBdc?">
+  Axis-aligned bounding box of the ship in world space. May be `null` if the ship has no blocks. From `org.joml.primitives.AABBdc`.
+</ParamField>
+
+<ParamField path="inertiaData" type="ShipInertiaData">
+  Computed inertia properties of the ship.
+
+  <ParamField path="inertiaData.centerOfMass" type="Vector3dc">
+    Center of mass in ship space.
+  </ParamField>
+
+  <ParamField path="inertiaData.mass" type="Double">
+    Total mass of the ship in kilograms (sum of block masses).
+  </ParamField>
+</ParamField>
+
+<ParamField path="velocity" type="Vector3dc">
+  Linear velocity of the ship in world space (meters per second). From `org.joml.Vector3dc`.
+</ParamField>
+
+<ParamField path="angularVelocity" type="Vector3dc">
+  Angular velocity of the ship in world space (radians per second). From `org.joml.Vector3dc`.
+</ParamField>
+
+<ParamField path="isStatic" type="Boolean">
+  When `true`, the physics engine does not apply forces or move the ship. The ship remains frozen in place. Readable on `Ship`; settable on `ServerShip`.
+</ParamField>
+
+## Methods
+
+<ParamField path="getAttachment(clazz)" type="T?">
+  Returns the ship attachment of type `T`, or `null` if none has been set. Attachments are the primary mechanism for storing per-ship mod data.
+
+  ```kotlin
+  val settings = ship.getAttachment(ShipSettings::class.java)
+  ```
+</ParamField>
+
+<ParamField path="setAttachment(attachment)" type="Unit">
+  Sets a ship attachment, replacing any existing attachment of the same type. The attachment type must be registered with `VsiCore.registerAttachment` on mod init.
+
+  ```kotlin
+  ship.setAttachment(MyShipData(initialValue = 42))
+  ```
+</ParamField>
+
+## Coordinate conversion
+
+VS2 provides extension functions on `Ship?` (and `Level?`) that convert positions between coordinate spaces. These are defined in `ValkyrienSkies.kt` and are available as top-level Kotlin functions or as static methods via `@JvmName("ValkyrienSkies")`.
+
+### Ship-space to world-space
+
+```kotlin
+// Kotlin
+val worldPos: Vec3 = ship.positionToWorld(shipSpacePos)
+
+// Also available on Level — resolves the managing ship automatically
+val worldPos: Vec3 = level.positionToWorld(shipSpacePos)
+```
+
+```java
+// Java
+Vec3 worldPos = ValkyrienSkies.positionToWorld(ship, shipSpacePos);
+```
+
+### World-space to ship-space
+
+```kotlin
+// Kotlin
+val shipPos: Vec3 = ship.positionToShip(worldSpacePos)
+```
+
+```java
+// Java
+Vec3 shipPos = ValkyrienSkies.positionToShip(ship, worldSpacePos);
+```
+
+### Using the transform matrix directly
+
+```kotlin
+// Transform a JOML Vector3d from ship space to world space without allocation
+val dest = Vector3d()
+ship.transform.shipToWorld.transformPosition(shipSpaceVec, dest)
+```
+
+## Common patterns
+
+### Get the ship managing a block
+
+```kotlin
+// Returns null if the block is not in any ship's shipyard
+val ship: Ship? = level.getShipManagingBlock(blockPos)
+```
+
+### Get a ship by ID
+
+```kotlin
+val ship: Ship? = level.getShipById(shipId)
+```
+
+### Iterate all ships
+
+```kotlin
+// All ships, loaded or unloaded
+for (ship in level.shipWorld?.allShips ?: emptyList()) {
+    println("Ship ${ship.slug ?: ship.id} at ${ship.transform.positionInWorld}")
+}
+```
+
+### Apply the ship's current velocity to an entity
+
+```kotlin
+import org.valkyrienskies.mod.common.applyShipVelocity
+
+// Gives an entity the combined linear + angular velocity of the ship it's on.
+entity.applyShipVelocity(ship)
+```
+
+<Note>
+  `Ship` is a read-only view. To modify physics properties such as `isStatic` or access forces, use [`ServerShip`](/api/ships/server-ship) on the server side.
+</Note>
+
+<Warning>
+  `Ship` properties like `transform` and `velocity` reflect the last game-tick snapshot. Do not read them from the physics thread (`physTick`). Use `PhysShip` inside `BlockEntityPhysicsListener.physTick` instead.
+</Warning>

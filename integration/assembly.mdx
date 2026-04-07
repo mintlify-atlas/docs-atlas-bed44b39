@@ -1,0 +1,242 @@
+---
+title: "Ship assembly"
+description: "Move a set of blocks from the world into a physics ship entity using ShipAssembler."
+---
+
+Assembly is the process of copying a set of `BlockPos` positions from a `ServerLevel` (or from an existing ship) into a freshly created ship in the shipyard. The blocks are removed from their original location and re-placed inside the new ship's chunk claim, preserving block entity data and block state.
+
+<Warning>
+  All `ShipAssembler` entry points are annotated with `@GameTickOnly`. They
+  **must** be called on the server game thread. Calling them from a physics
+  thread or a network handler thread will produce undefined behavior.
+</Warning>
+
+---
+
+## Core entry points
+
+### `assembleToShip`
+
+The simplest way to create a ship from a set of blocks.
+
+```kotlin
+import org.valkyrienskies.mod.common.assembly.ShipAssembler
+
+val ship: ServerShip = ShipAssembler.assembleToShip(
+    level,   // ServerLevel
+    blocks,  // Set<BlockPos>
+    scale    // Double (default 1.0)
+)
+```
+
+`blocks` must not be empty. Any block tagged `valkyrienskies:assemble_blacklist` is automatically skipped.
+
+---
+
+### `assembleToShipFull`
+
+Returns an `AssembleContext` with additional spatial information needed when you want to line up the new ship with the original block positions.
+
+```kotlin
+import org.valkyrienskies.mod.common.assembly.ShipAssembler
+import org.valkyrienskies.mod.common.assembly.ShipAssembler.AssembleContext
+
+val ctx: AssembleContext = ShipAssembler.assembleToShipFull(
+    level,   // ServerLevel
+    blocks,  // Set<BlockPos>
+    scale    // Double (default 1.0)
+)
+
+// ctx.ship       — the newly created ServerShip
+// ctx.fromCenter — centroid of the blocks in their original space (Vector3d)
+// ctx.toCenter   — centroid of the blocks in the new ship's space (Vector3d)
+```
+
+Use `fromCenter` / `toCenter` to compute offsets for contraptions, connections, or rendering anchors that need to know where the structure moved to.
+
+---
+
+### `moveBlocksFromTo`
+
+Low-level function. Moves blocks between two ships, from the world into a ship, or from a ship back into the world. Both `fromShip` and `toShip` may be `null` to represent the overworld.
+
+```kotlin
+import org.valkyrienskies.mod.common.assembly.ShipAssembler
+import org.valkyrienskies.mod.common.assembly.ShipAssembler.MoveContext
+
+val ctx: MoveContext = ShipAssembler.moveBlocksFromTo(
+    level,            // ServerLevel
+    blocks,           // Set<BlockPos>
+    fromShip,         // ServerShip? (null = overworld)
+    toShip,           // ServerShip? (null = overworld)
+    minStructurePos,  // BlockPos — bounding box min
+    maxStructurePos,  // BlockPos — bounding box max
+    toCenter,         // Vector3i — target center block in the destination
+    removeOriginal    // Boolean (default true)
+)
+
+// ctx.wasSuccessful — false if blocks is effectively empty after filtering
+// ctx.fromCenter    — centroid in the source coordinate space (Vector3d)
+// ctx.toCenter      — centroid in the destination coordinate space (Vector3d)
+```
+
+<Note>
+  Prefer `assembleToShip` or `assembleToShipFull` for the common case. Use
+  `moveBlocksFromTo` when you need precise control over the destination chunk or
+  when moving blocks between two existing ships.
+</Note>
+
+---
+
+### `deleteShip`
+
+Removes a ship from the world.
+
+```kotlin
+ShipAssembler.deleteShip(
+    level,        // ServerLevel
+    ship,         // ServerShip
+    deleteBlocks, // Boolean — whether to clear the blocks in the shipyard
+    dropBlocks    // Boolean — whether to drop items when deleting blocks
+)
+```
+
+When `deleteBlocks` is `true` and `dropBlocks` is `true`, blocks are broken as if by a player (items drop). When `dropBlocks` is `false`, they are silently replaced with air.
+
+---
+
+## Assembly blacklist
+
+Blocks tagged `valkyrienskies:assemble_blacklist` are ignored by `assembleToShip` and `moveBlocksFromTo`. Use this tag in a data pack if you want certain blocks — such as bedrock or structural anchors — to stay in the world when a ship is assembled around them.
+
+---
+
+## Assembly events
+
+VS2 fires three events during the assembly pipeline. Subscribe to them via the static fields on `VSAssemblyEvents`:
+
+```kotlin
+import org.valkyrienskies.mod.common.assembly.VSAssemblyEvents
+
+// Before any blocks are read from the source level
+VSAssemblyEvents.beforeCopy.on { event: VSAssemblyEvents.BeforeCopy ->
+    // event.level           — ServerLevel
+    // event.minPos          — bounding box min (Vector3dc)
+    // event.maxPos          — bounding box max (Vector3dc)
+    // event.center          — centroid of the structure (Vector3dc)
+    // event.shipAssembledFrom — source ship, or null if assembled from the overworld
+    // event.blockPositions  — Set<BlockPos> being assembled
+    // event.tempData        — mutable map for passing data to later events
+}
+
+// After the new ship is created but before blocks are placed
+VSAssemblyEvents.onPasteBeforeBlocksAreLoaded.on { event: VSAssemblyEvents.OnPasteBeforeBlocksAreLoaded ->
+    // event.oldShip         — source ship (ServerShip?)
+    // event.newShip         — new ship (ServerShip?)
+    // event.centerPosition  — Pair<fromCenter, toCenter> (Vector3dc)
+    // event.tempData        — read-only map from beforeCopy
+}
+
+// After all blocks are placed and block entities are loaded
+VSAssemblyEvents.onPasteAfterBlocksAreLoaded.on { event: VSAssemblyEvents.OnPasteAfterBlocksAreLoaded ->
+    // Same fields as onPasteBeforeBlocksAreLoaded
+}
+```
+
+Data stored in `BeforeCopy.tempData` is forwarded — as a read-only map — to both paste events, letting you pass context between stages without global state.
+
+---
+
+## Custom block and attachment behavior
+
+### `ICopyableBlock`
+
+Implement this interface on a `Block` subclass (not on the `BlockEntity`) when your block needs to transform its NBT during assembly — for example, to remap ship IDs stored inside the tag.
+
+```kotlin
+import org.valkyrienskies.mod.common.assembly.ICopyableBlock
+
+class MyBlock : Block(...), ICopyableBlock {
+
+    override fun onCopy(
+        level: ServerLevel,
+        pos: BlockPos,
+        state: BlockState,
+        be: BlockEntity?,
+        shipsBeingCopied: List<ServerShip>,
+        centerPositions: Map<Long, Vector3dc>
+    ): CompoundTag? {
+        // Return a modified tag, or null to use the block entity's tag unchanged.
+        return null
+    }
+
+    override fun onPaste(
+        level: ServerLevel,
+        pos: BlockPos,
+        state: BlockState,
+        oldShipIdToNewId: Map<Long, Long>,
+        centerPositions: Map<Long, Pair<Vector3dc, Vector3dc>>,
+        tag: CompoundTag?
+    ): CompoundTag? {
+        // Remap any ship IDs stored in the tag, then return it (or null to keep as-is).
+        return tag
+    }
+}
+```
+
+<Note>
+  `ICopyableBlock` is marked `@ApiStatus.Experimental`. Its signature may
+  change in future VS2 releases.
+</Note>
+
+---
+
+### `ICopyableAttachment`
+
+Implement this interface on a ship attachment (stored via `ship.setAttachment(...)`) when the attachment holds references to other ships or positional data that must be updated when the ship is copied.
+
+```kotlin
+import org.valkyrienskies.mod.common.assembly.ICopyableAttachment
+
+class MyAttachment : ICopyableAttachment {
+
+    override fun onCopy(
+        level: Supplier<ServerLevel>,
+        shipOn: LoadedServerShip,
+        shipsToBeSaved: List<ServerShip>,
+        centerPositions: Map<ShipId, Vector3dc>
+    ) {
+        // Prepare the attachment for serialization before the copy.
+    }
+
+    override fun onPaste(
+        level: Supplier<ServerLevel>,
+        shipOn: LoadedServerShip,
+        loadedShips: Map<Long, ServerShip>,
+        centerPositions: Map<ShipId, Pair<Vector3dc, Vector3dc>>
+    ) {
+        // Remap ship IDs and positions after all ships are created and blocks are loaded.
+    }
+}
+```
+
+<Note>
+  `ICopyableAttachment` is marked `@ApiStatus.Experimental`.
+</Note>
+
+---
+
+## Minimal example
+
+```kotlin
+import net.minecraft.core.BlockPos
+import net.minecraft.server.level.ServerLevel
+import org.valkyrienskies.mod.common.assembly.ShipAssembler
+
+fun assembleStructure(level: ServerLevel, blocks: Set<BlockPos>) {
+    // assembleToShip returns the new ServerShip.
+    // The blocks are removed from the world and placed inside the ship.
+    val ship = ShipAssembler.assembleToShip(level, blocks, scale = 1.0)
+    println("Created ship with id ${ship.id}")
+}
+```

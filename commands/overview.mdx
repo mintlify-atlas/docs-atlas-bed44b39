@@ -1,0 +1,265 @@
+---
+title: "Commands reference"
+description: "All /vs commands for managing ships in-game, with syntax, behavior, and permission levels."
+---
+
+All Valkyrien Skies commands are prefixed with `/vs`. Ship arguments accept ship **slugs** (the name-based identifier assigned when a ship is assembled) or ship names.
+
+Permission levels follow vanilla Minecraft conventions: `0` = all players, `2` = operators, `4` = server owners only.
+
+## Command list
+
+| Command | Description | Permission |
+|---|---|---|
+| `/vs delete <ships> [deleteBlocks]` | Delete one or more ships | 2 |
+| `/vs rename <ship> <newName>` | Rename a ship | 2 |
+| `/vs scale <ship> <scale>` | Set the render and physics scale of a ship | 2 |
+| `/vs teleport <ships> <pos> [euler-angles] [velocity] [angular-velocity]` | Teleport one or more ships | 2 |
+| `/vs set-static <ships> <true\|false>` | Enable or disable static mode | 2 |
+| `/vs splitting <ships> <true\|false>` | Enable or disable ship splitting | 2 |
+| `/vs get-ship` | Get the slug and ID of the ship you are looking at | 0 |
+| `/vs get-air [density\|temperature\|pressure]` | Get air properties at your current position | 0 |
+| `/vs get-gravity` | Get the gravity vector for the current dimension | 0 |
+| `/vs remass <ships>` | Recalculate mass from block data | 2 |
+| `/vs dry <ship>` | Remove all liquids from a ship | 2 |
+| `/vs backend engine <krunch\|DEFAULT\|physx\|jolt>` | Switch the physics backend | 4 |
+| `/vs backend lodDetail [amount]` | Get or set physics LOD detail level | 4 |
+
+---
+
+## `/vs delete`
+
+```text
+/vs delete <ships> [deleteBlocks]
+```
+
+Deletes one or more ships. By default the blocks in the shipyard are removed but **not dropped**. Pass `deleteBlocks: true` to also clear the blocks, or `false` to keep them.
+
+**Permission:** `SERVER.Commands.deleteShipCommandPerms` (default `2`)
+
+```text
+/vs delete my-ship
+/vs delete my-ship true
+```
+
+---
+
+## `/vs rename`
+
+```text
+/vs rename <ship> <newName>
+```
+
+Assigns a new display name and slug to a ship.
+
+**Permission:** `SERVER.Commands.renameShipCommandPerms` (default `2`)
+
+```text
+/vs rename old-name "My Airship"
+```
+
+---
+
+## `/vs scale`
+
+```text
+/vs scale <ship> <scale>
+```
+
+Sets the scale of a ship. The scale is a multiplier where `1.0` is the default size. The minimum accepted value is `0.001`. The configured `minScaling` server option (default `0.25`) may impose a practical minimum.
+
+**Permission:** `SERVER.Commands.scaleShipCommandPerms` (default `2`)
+
+```text
+/vs scale my-ship 2.0
+/vs scale my-ship 0.5
+```
+
+---
+
+## `/vs teleport`
+
+```text
+/vs teleport <ships> <pos>
+/vs teleport <ships> <pos> <euler-angles>
+/vs teleport <ships> <pos> <euler-angles> <velocity>
+/vs teleport <ships> <pos> <euler-angles> <velocity> <angular-velocity>
+```
+
+Teleports one or more ships to the given world position. All optional arguments extend the previous form:
+
+| Argument | Type | Description |
+|---|---|---|
+| `<ships>` | Ship selector | One or more ships to teleport |
+| `<pos>` | `x y z` | Target position in world space (supports `~` relative syntax) |
+| `<euler-angles>` | `x y z` | Rotation in Euler angles |
+| `<velocity>` | `x y z` | Initial linear velocity after teleport |
+| `<angular-velocity>` | `x y z` | Initial angular velocity after teleport |
+
+**Permission:** `SERVER.Commands.teleportShipCommandPerms` (default `2`)
+
+```text
+/vs teleport my-ship 100 64 200
+/vs teleport my-ship 100 64 200 0 90 0
+/vs teleport my-ship 100 64 200 0 0 0 0 0 10
+```
+
+---
+
+## `/vs set-static`
+
+```text
+/vs set-static <ships> <true|false>
+```
+
+Enables or disables static mode for one or more ships. A static ship is locked in place and does not respond to physics forces (gravity, buoyancy, collisions). Useful for temporarily pinning a ship while building.
+
+**Permission:** `SERVER.Commands.setStaticShipCommandPerms` (default `2`)
+
+```text
+/vs set-static my-ship true
+/vs set-static my-ship false
+```
+
+---
+
+## `/vs splitting`
+
+```text
+/vs splitting <ships> <true|false>
+```
+
+Enables or disables ship splitting for one or more ships. When splitting is enabled, breaking blocks that physically disconnect parts of a ship causes those parts to become separate ships. Only takes effect on loaded ships.
+
+**Permission:** Uses `SERVER.Commands.deleteShipCommandPerms` (default `2`)
+
+```text
+/vs splitting my-ship true
+/vs splitting my-ship false
+```
+
+---
+
+## `/vs get-ship`
+
+```text
+/vs get-ship
+```
+
+Ray-casts up to 10 blocks in front of you and reports the **slug** and **numeric ID** of whichever ship owns the block you are looking at. Only usable by entities (players); cannot be run from the server console.
+
+**Permission:** `SERVER.Commands.getShipCommandPerms` (default `0`)
+
+```text
+/vs get-ship
+```
+
+---
+
+## `/vs get-air`
+
+```text
+/vs get-air
+/vs get-air density
+/vs get-air temperature
+/vs get-air pressure
+```
+
+Reports atmospheric properties at your current Y-level for the current dimension. Used by VS2's aerodynamics system.
+
+| Subcommand | Returns |
+|---|---|
+| *(none)* | Density, temperature, and pressure together |
+| `density` | Air density at the current altitude |
+| `temperature` | Air temperature at the current altitude |
+| `pressure` | Air pressure at the current altitude |
+
+**Permission:** `SERVER.Commands.getAirValuesPerms` (default `0`)
+
+```text
+/vs get-air
+/vs get-air density
+```
+
+---
+
+## `/vs get-gravity`
+
+```text
+/vs get-gravity
+```
+
+Reports the gravity vector configured for the current dimension.
+
+**Permission:** `SERVER.Commands.getAirValuesPerms` (default `0`)
+
+```text
+/vs get-gravity
+```
+
+---
+
+## `/vs remass`
+
+```text
+/vs remass <ships>
+```
+
+Forces VS2 to re-scan all blocks on one or more ships and recalculate their mass. Useful after editing ship contents without going through normal assembly/disassembly.
+
+**Permission:** `SERVER.Commands.remassShipCommandPerms` (default `2`)
+
+```text
+/vs remass my-ship
+```
+
+---
+
+## `/vs dry`
+
+```text
+/vs dry <ship>
+```
+
+Removes all liquid blocks from a ship's bounding box. This includes source blocks, flowing fluids, and waterlogged blocks. Intended for use with the upcoming ship-flooding feature.
+
+**Permission:** `SERVER.Commands.dryShipCommandPerms` (default `2`)
+
+```text
+/vs dry my-ship
+```
+
+---
+
+## `/vs backend`
+
+```text
+/vs backend engine
+/vs backend engine <krunch|DEFAULT|physx|jolt>
+/vs backend lodDetail
+/vs backend lodDetail <amount>
+```
+
+Debug and advanced commands for controlling the physics backend. Changes take effect immediately and are persisted to config.
+
+| Subcommand | Description |
+|---|---|
+| `engine` | Print the current physics engine |
+| `engine krunch` | Switch to Krunch Classic (default) |
+| `engine DEFAULT` | Alias for `krunch` |
+| `engine physx` | Switch to Krunch with PhysX |
+| `engine jolt` | Switch to Krunch with Jolt |
+| `lodDetail` | Print the current LOD detail level |
+| `lodDetail <amount>` | Set the LOD detail level; `-1` disables LOD |
+
+**Permission:** `SERVER.Commands.changeBackendCommandPerms` (default `4`)
+
+<Warning>
+  The `physx` and `jolt` backends are experimental. Only change the backend if you know what you are doing.
+</Warning>
+
+```text
+/vs backend engine
+/vs backend engine krunch
+/vs backend lodDetail -1
+```

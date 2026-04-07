@@ -1,0 +1,534 @@
+---
+title: 'VsApi'
+description: 'Reference for every method and property on the VsApi interface and its Kotlin extension functions.'
+---
+
+`VsApi` is the main interface for the Valkyrien Skies 2 public API. It extends `VsCoreApi` and is annotated `@NonExtendable` — you must not implement it yourself. Obtain the singleton instance via `vsApi` (Kotlin) or `ValkyrienSkies.api()` (Java).
+
+```kotlin
+import org.valkyrienskies.mod.api.vsApi
+// or, using the Kotlin extension property:
+import org.valkyrienskies.mod.api.shipWorld
+```
+
+---
+
+## Getting ship worlds
+
+### `getShipWorld`
+
+Returns the `ShipWorld` associated with the given `Level`, or `null` if none exists.
+
+On a `ServerLevel` the returned object is a `ServerShipWorld`. On a `ClientLevel` it is a `ClientShipWorld`.
+
+<ParamField path="level" type="Level?">
+  The level to look up. If `null`, returns `null`.
+</ParamField>
+
+<ResponseField name="returns" type="ShipWorld?">
+  The ship world for the given level, or `null`.
+</ResponseField>
+
+<CodeGroup>
+
+```kotlin kotlin
+val shipWorld: ShipWorld? = vsApi.getShipWorld(level)
+// or via extension property:
+val shipWorld: ShipWorld? = level.shipWorld
+```
+
+```java java
+ShipWorld shipWorld = ValkyrienSkies.api().getShipWorld(level);
+```
+
+</CodeGroup>
+
+---
+
+### `getServerShipWorld(server)`
+
+Returns the `ServerShipWorld` associated with the given `MinecraftServer`, or `null` if none exists.
+
+<ParamField path="server" type="MinecraftServer?">
+  The server whose ship world to retrieve. If `null`, returns `null`.
+</ParamField>
+
+<ResponseField name="returns" type="ServerShipWorld?">
+  The server ship world, or `null`.
+</ResponseField>
+
+<CodeGroup>
+
+```kotlin kotlin
+val serverShipWorld: ServerShipWorld? = vsApi.getServerShipWorld(server)
+// or via extension property:
+val serverShipWorld: ServerShipWorld? = server.shipWorld
+```
+
+```java java
+ServerShipWorld serverShipWorld = ValkyrienSkies.api().getServerShipWorld(server);
+```
+
+</CodeGroup>
+
+---
+
+### `getClientShipWorld(client)`
+
+Returns the `ClientShipWorld` associated with the given `Minecraft` instance, or `null` if none exists.
+
+<ParamField path="client" type="Minecraft?">
+  The client whose ship world to retrieve. If `null`, returns `null`.
+</ParamField>
+
+<ResponseField name="returns" type="ClientShipWorld?">
+  The client ship world, or `null`.
+</ResponseField>
+
+<CodeGroup>
+
+```kotlin kotlin
+val clientShipWorld: ClientShipWorld? = vsApi.getClientShipWorld(Minecraft.getInstance())
+// or via extension property:
+val clientShipWorld: ClientShipWorld? = Minecraft.getInstance().shipWorld
+```
+
+```java java
+ClientShipWorld clientShipWorld = ValkyrienSkies.api().getClientShipWorld(Minecraft.getInstance());
+```
+
+</CodeGroup>
+
+---
+
+### `getServerShipWorld()` <sup>Experimental</sup>
+
+<Warning>
+  This method is `@Experimental` and may change or be removed in a future release.
+</Warning>
+
+Returns the globally unique `ServerShipWorld` if one exists and exactly one `MinecraftServer` is loaded. Returns `null` if no ship world is loaded or if multiple servers are loaded.
+
+Prefer `getServerShipWorld(MinecraftServer)` in almost all cases.
+
+<ResponseField name="returns" type="ServerShipWorld?">
+  The unique server ship world, or `null`.
+</ResponseField>
+
+---
+
+### `getClientShipWorld()` <sup>Experimental</sup>
+
+<Warning>
+  This method is `@Experimental` and may change or be removed in a future release.
+</Warning>
+
+Returns the globally unique `ClientShipWorld` if one exists and exactly one `Minecraft` instance is loaded.
+
+Prefer `getClientShipWorld(Minecraft)` in almost all cases.
+
+<ResponseField name="returns" type="ClientShipWorld?">
+  The unique client ship world, or `null`.
+</ResponseField>
+
+---
+
+## Dimension utilities
+
+### `getDimensionId`
+
+Returns the `DimensionId` string used internally by vs-core to identify the given level.
+
+<ParamField path="level" type="Level" required>
+  The level whose dimension ID to retrieve.
+</ParamField>
+
+<ResponseField name="returns" type="DimensionId">
+  The dimension identifier string.
+</ResponseField>
+
+```kotlin
+val dimId: DimensionId = vsApi.getDimensionId(level)
+// or via extension property:
+val dimId: DimensionId? = level.dimensionId
+```
+
+---
+
+## Shipyard queries
+
+### `isChunkInShipyard`
+
+Returns `true` if the specified chunk is inside a shipyard (i.e., allocated to a ship). Always returns `false` if `level` is `null`.
+
+<ParamField path="level" type="Level?">
+  The level to query. If `null`, always returns `false`.
+</ParamField>
+
+<ParamField path="chunkX" type="Int" required>
+  The chunk X coordinate.
+</ParamField>
+
+<ParamField path="chunkZ" type="Int" required>
+  The chunk Z coordinate.
+</ParamField>
+
+<ResponseField name="returns" type="Boolean">
+  `true` if the chunk is in the shipyard.
+</ResponseField>
+
+<CodeGroup>
+
+```kotlin kotlin
+val inShipyard: Boolean = vsApi.isChunkInShipyard(level, chunkX, chunkZ)
+// or via extension function:
+val inShipyard: Boolean = level.isChunkInShipyard(chunkX, chunkZ)
+// also available for block positions:
+val inShipyard: Boolean = level.isBlockInShipyard(blockPos)
+```
+
+```java java
+boolean inShipyard = ValkyrienSkies.api().isChunkInShipyard(level, chunkX, chunkZ);
+```
+
+</CodeGroup>
+
+---
+
+### `getShipManagingBlock`
+
+Returns the ship whose shipyard chunk claim contains the given block position, or `null` if no such ship exists.
+
+Returns a `ServerShip` when `level` is a `ServerLevel`, and a `ClientShip` when `level` is a `ClientLevel`. Returns `null` if either parameter is `null`.
+
+<ParamField path="level" type="Level?">
+  The level to search. Must not be `null` for a result.
+</ParamField>
+
+<ParamField path="pos" type="BlockPos?">
+  A block position in the shipyard. Must not be `null` for a result.
+</ParamField>
+
+<ResponseField name="returns" type="Ship?">
+  The ship managing the block's chunk, or `null`.
+</ResponseField>
+
+<CodeGroup>
+
+```kotlin kotlin
+val ship: Ship? = vsApi.getShipManagingBlock(level, pos)
+// or via extension function:
+val ship: Ship? = level.getShipManagingBlock(pos)
+```
+
+```java java
+Ship ship = ValkyrienSkies.api().getShipManagingBlock(level, pos);
+```
+
+</CodeGroup>
+
+---
+
+### `getShipManagingChunk(level, pos)`
+
+Returns the ship whose shipyard chunk claim contains the given `ChunkPos`, or `null` if none exists. Returns a `ServerShip` for `ServerLevel` and a `ClientShip` for `ClientLevel`.
+
+<ParamField path="level" type="Level?">
+  The level to search.
+</ParamField>
+
+<ParamField path="pos" type="ChunkPos?">
+  The chunk position to look up.
+</ParamField>
+
+<ResponseField name="returns" type="Ship?">
+  The ship managing the chunk, or `null`.
+</ResponseField>
+
+---
+
+### `getShipManagingChunk(level, chunkX, chunkZ)`
+
+Overload of `getShipManagingChunk` that accepts raw chunk coordinates instead of a `ChunkPos`.
+
+<ParamField path="level" type="Level?">
+  The level to search.
+</ParamField>
+
+<ParamField path="chunkX" type="Int" required>
+  The chunk X coordinate.
+</ParamField>
+
+<ParamField path="chunkZ" type="Int" required>
+  The chunk Z coordinate.
+</ParamField>
+
+<ResponseField name="returns" type="Ship?">
+  The ship managing the chunk, or `null`.
+</ResponseField>
+
+---
+
+### `getShipsIntersecting(level, aabb)`
+
+Returns all ships whose world-space AABBs intersect the given `AABBdc`.
+
+<ParamField path="level" type="Level?">
+  The level to query.
+</ParamField>
+
+<ParamField path="aabb" type="AABBdc?">
+  The axis-aligned bounding box to test against.
+</ParamField>
+
+<ResponseField name="returns" type="Iterable&lt;Ship&gt;">
+  All intersecting ships. May be empty.
+</ResponseField>
+
+<CodeGroup>
+
+```kotlin kotlin
+val ships: Iterable<Ship> = vsApi.getShipsIntersecting(level, aabb)
+// or via extension function:
+val ships: Iterable<Ship> = level.getShipsIntersecting(aabb)
+```
+
+```java java
+Iterable<Ship> ships = ValkyrienSkies.api().getShipsIntersecting(level, aabb);
+```
+
+</CodeGroup>
+
+---
+
+### `getShipsIntersecting(level, x, y, z)`
+
+Returns all ships whose world-space AABBs contain the given point.
+
+<ParamField path="level" type="Level?">
+  The level to query.
+</ParamField>
+
+<ParamField path="x" type="Double" required>
+  World X coordinate.
+</ParamField>
+
+<ParamField path="y" type="Double" required>
+  World Y coordinate.
+</ParamField>
+
+<ParamField path="z" type="Double" required>
+  World Z coordinate.
+</ParamField>
+
+<ResponseField name="returns" type="Iterable&lt;Ship&gt;">
+  All ships whose AABB contains the point. May be empty.
+</ResponseField>
+
+<CodeGroup>
+
+```kotlin kotlin
+val ships: Iterable<Ship> = vsApi.getShipsIntersecting(level, x, y, z)
+// or via extension function:
+val ships: Iterable<Ship> = level.getShipsIntersecting(x, y, z)
+```
+
+```java java
+Iterable<Ship> ships = ValkyrienSkies.api().getShipsIntersecting(level, x, y, z);
+```
+
+</CodeGroup>
+
+---
+
+## Entity mounting
+
+### `isShipMountingEntity`
+
+Returns `true` if the entity is currently mounted to a ship.
+
+<ParamField path="entity" type="Entity" required>
+  The entity to check.
+</ParamField>
+
+<ResponseField name="returns" type="Boolean">
+  `true` if the entity is mounted to a ship.
+</ResponseField>
+
+---
+
+### `getShipMountedTo`
+
+Returns the ship that the entity is mounted to, or `null` if it is not mounted to any ship.
+
+<ParamField path="entity" type="Entity?">
+  The entity to check.
+</ParamField>
+
+<ResponseField name="returns" type="Ship?">
+  The ship the entity is mounted to, or `null`.
+</ResponseField>
+
+---
+
+### `getMountPosInShip(entity)`
+
+Returns the position in ship space that the entity is mounted to, or `null` if the entity is not mounted.
+
+<ParamField path="entity" type="Entity?">
+  The entity to check.
+</ParamField>
+
+<ResponseField name="returns" type="Vector3dc?">
+  The mount position in ship space, or `null`.
+</ResponseField>
+
+---
+
+### `getMountPosInShip(entity, partialTicks)`
+
+Same as `getMountPosInShip(entity)` but interpolates the position using `partialTicks` for smooth rendering.
+
+<ParamField path="entity" type="Entity?">
+  The entity to check.
+</ParamField>
+
+<ParamField path="partialTicks" type="Float" required>
+  Interpolation factor between the previous and current tick, in the range `[0.0, 1.0]`.
+</ParamField>
+
+<ResponseField name="returns" type="Vector3dc?">
+  The interpolated mount position in ship space, or `null`.
+</ResponseField>
+
+---
+
+## Events <sup>Experimental</sup>
+
+All three event properties are `@Experimental` and may change in a future release.
+
+<Warning>
+  Register listeners for these events during mod initialization. The event instances are stable for the lifetime of the game session.
+</Warning>
+
+### `registerBlockStateEvent`
+
+Fired when VS2 is ready to receive registrations that map Minecraft block states to physics block states.
+
+```kotlin
+vsApi.registerBlockStateEvent.on { event ->
+    event.registerBlockState(myBlock.defaultBlockState(), myPhysicsType)
+}
+```
+
+### `preRenderShipEvent`
+
+Fired before each ship is rendered. Use this to set up per-ship rendering state.
+
+```kotlin
+vsApi.preRenderShipEvent.on { event ->
+    // event.ship, event.poseStack, etc.
+}
+```
+
+### `postRenderShipEvent`
+
+Fired after each ship is rendered. Use this to tear down per-ship rendering state.
+
+```kotlin
+vsApi.postRenderShipEvent.on { event ->
+    // event.ship, event.poseStack, etc.
+}
+```
+
+---
+
+## Kotlin extension functions
+
+The file `ValkyrienSkies.kt` (`@file:JvmName("ValkyrienSkies")`) provides a set of convenience extension functions and properties. These are Kotlin-idiomatic wrappers around `VsApi` methods.
+
+### Extension properties
+
+| Property | Receiver | Type | Description |
+|---|---|---|---|
+| `shipWorld` | `Level?` | `ShipWorld?` | The `ShipWorld` for this level. |
+| `shipWorld` | `MinecraftServer?` | `ServerShipWorld?` | The `ServerShipWorld` for this server. |
+| `shipWorld` | `Minecraft?` | `ClientShipWorld?` | The `ClientShipWorld` for this client. |
+| `dimensionId` | `Level` | `DimensionId` | The vs-core dimension ID for this level. |
+| `dimensionId` | `Level?` | `DimensionId?` | Null-safe variant. |
+
+### Ship lookup extensions
+
+```kotlin
+// Find the ship managing a block position
+val ship: Ship? = level.getShipManagingBlock(pos)             // BlockPos?
+val ship: Ship? = level.getShipManagingBlock(x, y, z)        // Int, Int, Int
+val ship: Ship? = level.getShipManagingBlock(vec)            // Vector3dc?
+val ship: Ship? = level.getShipManagingBlock(position)       // Position?
+
+// Find the ship managing a chunk
+val ship: Ship? = level.getShipManagingChunk(chunkX, chunkZ) // Int, Int
+val ship: Ship? = level.getShipManagingChunk(chunkPos)       // ChunkPos?
+
+// Find a ship by its ID
+val ship: Ship? = level.getShipById(id)
+
+// Find the ship the entity is standing on
+val ship: Ship? = entity.getShipManagingEntity()
+```
+
+### Shipyard check extensions
+
+```kotlin
+val inShipyard: Boolean = level.isBlockInShipyard(pos)          // BlockPos
+val inShipyard: Boolean = level.isBlockInShipyard(x, y, z)     // Int, Int, Int
+val inShipyard: Boolean = level.isChunkInShipyard(chunkX, chunkZ)
+```
+
+### Ship intersection extensions
+
+```kotlin
+val ships: Iterable<Ship> = level.getShipsIntersecting(aabb)        // AABBdc?
+val ships: Iterable<Ship> = level.getShipsIntersecting(x, y, z)    // Double, Double, Double
+```
+
+### Position transform extensions
+
+Transform a world-space position into the ship spaces of all nearby ships:
+
+```kotlin
+// Returns the point transformed into ship space for every ship whose AABB contains x/y/z
+val shipSpacePositions: Iterable<Vector3d> = level.positionToNearbyShips(x, y, z)
+
+// Also includes the original world-space point as the first entry
+val allPositions: Iterable<Vector3d> = level.positionToNearbyShipsAndWorld(x, y, z)
+```
+
+Transform a `Vec3` or `Vector3dc` through a ship's transform:
+
+```kotlin
+// Ship-to-world
+val worldPos: Vec3 = shipTransform.positionToWorld(shipPos)         // Vec3
+val worldPos: Vector3d = shipTransform.positionToWorld(shipPos)     // Vector3d / Vector3dc
+
+// World-to-ship
+val shipPos: Vec3 = shipTransform.positionToShip(worldPos)          // Vec3
+val shipPos: Vector3d = shipTransform.positionToShip(worldPos)      // Vector3d / Vector3dc
+```
+
+These functions also have overloads on `Ship?` and `Level?` for convenience.
+
+### Distance utilities
+
+Ship-aware distance functions that transform positions into world space before calculating:
+
+```kotlin
+val dist: Double = level.distance(x1, y1, z1, x2, y2, z2)
+val dist: Double = level.distance(pos1, pos2)                    // Position, Position
+
+val distSq: Double = level.distanceSquared(x1, y1, z1, x2, y2, z2)
+val distSq: Double = level.distanceSquared(pos1, pos2)           // Position, Position
+val distSq: Double = level.distanceSquared(vec1, vec2)           // Vec3i, Vec3i
+
+val closer: Boolean = level.closerThan(pos1, pos2, maxDistance)
+```

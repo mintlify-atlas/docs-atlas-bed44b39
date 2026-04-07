@@ -1,0 +1,189 @@
+---
+title: 'ShipWorld'
+description: 'The container for all ships in a dimension. Covers ShipWorld, ServerShipWorld, and ClientShipWorld.'
+---
+
+`ShipWorld` is the top-level container that holds every ship loaded in a single Minecraft dimension. It provides access to the ship registry, supports querying ships by position or ID, and — on the server side — exposes operations to create and delete ships.
+
+There are two concrete sub-types:
+
+| Type | Side | Description |
+|---|---|---|
+| `ServerShipWorld` | Server | Full physics access. Ships can be created, deleted, and modified. |
+| `ClientShipWorld` | Client | Read-only view of the ships the server has sent to this client. |
+
+---
+
+## Getting a ShipWorld
+
+The simplest way to get a `ShipWorld` is through the `Level` extension property:
+
+<Tabs>
+  <Tab title="Kotlin">
+    ```kotlin
+    import org.valkyrienskies.mod.api.shipWorld
+
+    // From any Level (server or client)
+    val shipWorld: ShipWorld? = level.shipWorld
+
+    // Specifically server-side
+    val serverShipWorld: ServerShipWorld? = server.shipWorld
+
+    // Specifically client-side
+    val clientShipWorld: ClientShipWorld? = Minecraft.getInstance().shipWorld
+    ```
+  </Tab>
+  <Tab title="Java">
+    ```java
+    import org.valkyrienskies.mod.api.ValkyrienSkies;
+
+    // From any Level
+    ShipWorld shipWorld = ValkyrienSkies.api().getShipWorld(level);
+
+    // Server-side
+    ServerShipWorld serverShipWorld = ValkyrienSkies.api().getServerShipWorld(server);
+
+    // Client-side
+    ClientShipWorld clientShipWorld = ValkyrienSkies.api().getClientShipWorld(Minecraft.getInstance());
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  All three methods return `null` when no ship world is associated with the given object (for example, before the world has fully loaded).
+</Note>
+
+---
+
+## Querying ships
+
+### `allShips`
+
+Every `ShipWorld` exposes an `allShips` property of type `QueryableShipData<Ship>`. This is the primary way to look up ships.
+
+```kotlin
+val shipWorld: ShipWorld? = level.shipWorld ?: return
+
+// Iterate every loaded ship
+for (ship in shipWorld.allShips) {
+    println(ship.id)
+}
+
+// Look up a ship by its numeric ID
+val ship: Ship? = shipWorld.allShips.getById(shipId)
+```
+
+`QueryableShipData` supports additional query methods — for example, finding ships by chunk position — depending on the vs-core version in use.
+
+---
+
+## Server-side operations
+
+The following operations are only available on `ServerShipWorld`, which you obtain from a `MinecraftServer` or a `ServerLevel`.
+
+<Note>
+  All server-side mutations must be called on the game thread. Using them from the physics thread requires scheduling work back to the game thread.
+</Note>
+
+### Creating a ship
+
+Use `createNewShipAtBlock` to assemble a new ship from an existing structure in the world. The exact signature is defined by vs-core's `ServerShipWorld` interface.
+
+```kotlin
+val serverLevel: ServerLevel = level as? ServerLevel ?: return
+val serverShipWorld: ServerShipWorld = server.shipWorld ?: return
+
+// The ShipAssembler (from vs-core) handles moving blocks into the shipyard
+serverShipWorld.createNewShipAtBlock(blockPos, false, 1.0, serverLevel)
+```
+
+<Warning>
+  Creating a ship moves blocks from the world into the shipyard. This is a destructive operation — ensure the source chunk is loaded before calling it.
+</Warning>
+
+### Deleting a ship
+
+Use `deleteShip` to permanently remove a ship and its shipyard chunks from the world.
+
+```kotlin
+val serverShipWorld: ServerShipWorld = server.shipWorld ?: return
+serverShipWorld.deleteShip(ship)
+```
+
+Deleted ships are gone immediately — there is no undo. Blocks in the ship's shipyard chunks are also removed.
+
+### Forcing connectivity updates
+
+`forceUpdateConnectivityChunk` signals vs-core to re-evaluate the connectivity graph for a specific chunk. Call this after programmatically modifying blocks in the shipyard so the physics engine picks up the changes.
+
+```kotlin
+serverShipWorld.forceUpdateConnectivityChunk(chunkX, chunkZ, dimensionId)
+```
+
+---
+
+## Client-side usage
+
+`ClientShipWorld` is read-only. You can iterate `allShips` and read ship transforms for rendering, but you cannot create or delete ships.
+
+```kotlin
+val clientShipWorld: ClientShipWorld = Minecraft.getInstance().shipWorld ?: return
+
+for (ship in clientShipWorld.allShips) {
+    val transform = ship.renderTransform
+    // Use transform for custom rendering
+}
+```
+
+---
+
+## Common patterns
+
+### Checking whether a block is on a ship
+
+```kotlin
+import org.valkyrienskies.mod.api.getShipManagingBlock
+import org.valkyrienskies.mod.api.shipWorld
+
+val ship: Ship? = level.getShipManagingBlock(pos)
+if (ship != null) {
+    // The block at `pos` is in the shipyard of `ship`
+}
+```
+
+### Iterating all ships in a dimension
+
+```kotlin
+val shipWorld: ShipWorld = level.shipWorld ?: return
+for (ship in shipWorld.allShips) {
+    val worldPos = ship.transform.positionInWorld
+    println("Ship ${ship.id} is at $worldPos")
+}
+```
+
+### Finding ships near a world-space point
+
+```kotlin
+import org.valkyrienskies.mod.api.getShipsIntersecting
+
+val nearbyShips: Iterable<Ship> = level.getShipsIntersecting(x, y, z)
+for (ship in nearbyShips) {
+    // ship.transform gives the current ship-to-world transform
+}
+```
+
+---
+
+## See also
+
+<CardGroup cols={3}>
+  <Card title="VsApi" icon="code" href="/api/vs-api">
+    All methods available on the `VsApi` singleton, including the ship query helpers.
+  </Card>
+  <Card title="Ship" icon="ship" href="/api/ships/ship">
+    Properties and methods on individual `Ship` objects.
+  </Card>
+  <Card title="Block physics listener" icon="cube" href="/api/events/block-entity-physics">
+    Receive physics-thread callbacks for block entities on ships.
+  </Card>
+</CardGroup>

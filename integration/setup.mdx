@@ -1,0 +1,149 @@
+---
+title: "Mod integration setup"
+description: "Add Valkyrien Skies 2 as a dependency in your mod and access the VS API."
+---
+
+This guide walks through adding VS2 as a compile-time dependency so you can call the assembly, physics, and data generation APIs from your own mod.
+
+<Note>
+  VS2 requires **KotlinForForge** in Forge development environments. The exact
+  version is listed in the VS2 `gradle.properties` file.
+</Note>
+
+## Prerequisites
+
+- A Gradle-based Minecraft mod project (Fabric, Forge, Quilt, or a multiloader setup using Architectury).
+- Java 17 or later.
+
+---
+
+<Steps>
+
+<Step title="Add the VS Maven repository">
+
+Open your root `build.gradle` (or `build.gradle.kts`) and add the Valkyrien Skies Maven repository inside the `repositories` block:
+
+```groovy build.gradle
+repositories {
+    // ...
+    maven {
+        name = "Valkyrien Skies"
+        url = "https://maven.valkyrienskies.org"
+    }
+    // ...
+}
+```
+
+</Step>
+
+<Step title="Declare the dependencies">
+
+Add the VS2 mod dependency and the three VS Core library dependencies to your `dependencies` block:
+
+```groovy build.gradle
+dependencies {
+    // ...
+
+    // VS2 mod — replace -fabric with -forge or use -common for multiloader
+    modApi("org.valkyrienskies:valkyrienskies-120-fabric:${vs2_version}") {
+        exclude group: 'com.simibubi', module: ''
+        exclude group: 'dev.engine-room', module: ''
+        exclude group: 'com.jozufozu', module: ''
+    }
+
+    // VS Core libraries
+    implementation("org.valkyrienskies.core:api:${vscore_version}") {
+        exclude group: 'org.joml', module: ''
+    }
+    implementation("org.valkyrienskies.core:internal:${vscore_version}") {
+        exclude group: 'org.joml', module: ''
+    }
+    implementation("org.valkyrienskies.core:util:${vscore_version}") {
+        exclude group: 'org.joml', module: ''
+    }
+
+    // ...
+}
+```
+
+</Step>
+
+<Step title="Set the version variables">
+
+Add the version strings to your `gradle.properties`:
+
+```properties gradle.properties
+# VS2 version — format: <version>-beta.<n>+<first 10 chars of commit hash>
+# Example for VS2 2.5.0-beta.3:
+vs2_version=2.5.0-beta.3+<commit-hash>
+
+# VS Core version — taken directly from VS2's gradle.properties
+vscore_version=1.1.0+4a7e0044b9
+```
+
+<Tip>
+  You can always find the current `vs_core_version` value in the VS2 repository's
+  [`gradle.properties`](https://github.com/ValkyrienSkies/Valkyrien-Skies-2/blob/master/gradle.properties)
+  file. The `vs2_version` is published to the VS Maven at
+  `https://maven.valkyrienskies.org`.
+</Tip>
+
+</Step>
+
+<Step title="Choose the correct loader suffix">
+
+The VS2 artifact name uses a loader suffix to target the right platform:
+
+| Loader / setup | Artifact suffix |
+|----------------|----------------|
+| Fabric or Quilt | `-fabric` |
+| Forge | `-forge` |
+| Multiloader common source set | `-common` |
+
+Replace `-fabric` in the `modApi` line from step 2 with the suffix that matches your project.
+
+<Warning>
+  Forge projects must also declare a dependency on **KotlinForForge**. The
+  required version is listed in VS2's `gradle.properties`. Without it, VS2 will
+  fail to load on Forge.
+</Warning>
+
+</Step>
+
+<Step title="Access the VS API">
+
+VS2 exposes its API through a top-level property called `vsApi`. Import it and use the extension functions it provides on Minecraft types:
+
+```kotlin
+import org.valkyrienskies.mod.api.vsApi
+
+// Register physics block states at startup
+vsApi.registerBlockStateEvent.on { event ->
+    // see the Block Physics Registration guide
+}
+
+// Query ships from a Level
+val ship = level.getShipManagingBlock(blockPos)
+
+// Query ships from an Entity
+val ship = entity.getShipManagingEntity()
+
+// Get the ServerShipWorld for a server
+val shipWorld = server.shipWorld
+```
+
+Extension functions on `Level`, `Entity`, `MinecraftServer`, and `Minecraft` are all defined in
+`org.valkyrienskies.mod.api.ValkyrienSkies` (the `ValkyrienSkies.kt` file). You can import that
+package directly or rely on auto-import in your IDE.
+
+</Step>
+
+</Steps>
+
+---
+
+## Next steps
+
+- [Ship assembly](/integration/assembly) — move blocks from the world into a physics ship.
+- [Block physics registration](/integration/block-physics) — give VS2 the shape of your blocks.
+- [Data generation](/integration/datagen) — generate block mass, friction, and elasticity data packs.
